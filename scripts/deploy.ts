@@ -1,71 +1,48 @@
 import { ethers } from "hardhat";
+import * as fs from "fs";
+import * as path from "path";
 
 async function main() {
-  console.log("Deploying Paystream Escrow MVP...\n");
+  console.log("Deploying Paystream to Sepolia...\n");
 
   const [deployer] = await ethers.getSigners();
-  console.log(`Deploying with account: ${deployer.address}\n`);
+  console.log(`Deploying with account: ${deployer.address}`);
+  console.log(`Account balance: ${ethers.formatEther(await ethers.provider.getBalance(deployer.address))} ETH\n`);
 
-  // Deploy PaymentToken
-  console.log("Deploying PaymentToken...");
-  const PaymentTokenFactory = await ethers.getContractFactory("PaymentToken");
-  const paymentToken = await PaymentTokenFactory.deploy();
-  await paymentToken.waitForDeployment();
-  const paymentTokenAddress = await paymentToken.getAddress();
-  console.log(`PaymentToken deployed to: ${paymentTokenAddress}\n`);
-
-  // Deploy AccessControl
-  console.log("Deploying AccessControl...");
-  const AccessControlFactory = await ethers.getContractFactory("AccessControl");
-  const accessControl = await AccessControlFactory.deploy();
-  await accessControl.waitForDeployment();
-  const accessControlAddress = await accessControl.getAddress();
-  console.log(`AccessControl deployed to: ${accessControlAddress}\n`);
-
-  // Deploy SalaryStreamEscrow
-  console.log("Deploying SalaryStreamEscrow...");
-  const SalaryStreamFactory = await ethers.getContractFactory("SalaryStreamEscrow");
-  const salaryStream = await SalaryStreamFactory.deploy(paymentTokenAddress, accessControlAddress);
-  await salaryStream.waitForDeployment();
-  const salaryStreamAddress = await salaryStream.getAddress();
-  console.log(`SalaryStreamEscrow deployed to: ${salaryStreamAddress}\n`);
-
-  // Deploy MilestoneEscrow
-  console.log("Deploying MilestoneEscrow...");
-  const MilestoneFactory = await ethers.getContractFactory("MilestoneEscrow");
-  const milestoneEscrow = await MilestoneFactory.deploy(
-    paymentTokenAddress,
-    accessControlAddress,
-    salaryStreamAddress
-  );
-  await milestoneEscrow.waitForDeployment();
-  const milestoneEscrowAddress = await milestoneEscrow.getAddress();
-  console.log(`MilestoneEscrow deployed to: ${milestoneEscrowAddress}\n`);
+  // Deploy Paystream
+  console.log("Deploying Paystream...");
+  const PaystreamFactory = await ethers.getContractFactory("Paystream");
+  const paystream = await PaystreamFactory.deploy();
+  await paystream.waitForDeployment();
+  const paystreamAddress = await paystream.getAddress();
+  console.log(`✓ Paystream deployed to: ${paystreamAddress}\n`);
 
   // Output deployment summary
   console.log("=== Deployment Summary ===\n");
-  console.log("Deployed Contracts:");
-  console.log(`  PaymentToken:       ${paymentTokenAddress}`);
-  console.log(`  AccessControl:      ${accessControlAddress}`);
-  console.log(`  SalaryStreamEscrow: ${salaryStreamAddress}`);
-  console.log(`  MilestoneEscrow:    ${milestoneEscrowAddress}`);
-  console.log(`\nDeployer:            ${deployer.address}\n`);
+  console.log("Network: Sepolia");
+  console.log(`Paystream: ${paystreamAddress}`);
+  console.log(`Deployer:  ${deployer.address}`);
+  console.log(`Timestamp: ${new Date().toISOString()}\n`);
 
-  // Save deployment addresses
+  // Save deployment addresses to file
   const deploymentData = {
-    network: (await ethers.provider.getNetwork()).name,
+    network: "sepolia",
     timestamp: new Date().toISOString(),
     deployer: deployer.address,
     contracts: {
-      PaymentToken: paymentTokenAddress,
-      AccessControl: accessControlAddress,
-      SalaryStreamEscrow: salaryStreamAddress,
-      MilestoneEscrow: milestoneEscrowAddress,
+      Paystream: paystreamAddress,
     },
   };
 
-  console.log("Deployment Data:");
-  console.log(JSON.stringify(deploymentData, null, 2));
+  const deploymentPath = path.join(__dirname, "../deployments/sepolia.json");
+  const deploymentDir = path.dirname(deploymentPath);
+
+  if (!fs.existsSync(deploymentDir)) {
+    fs.mkdirSync(deploymentDir, { recursive: true });
+  }
+
+  fs.writeFileSync(deploymentPath, JSON.stringify(deploymentData, null, 2));
+  console.log(`✓ Deployment addresses saved to: deployments/sepolia.json`);
 }
 
 main().catch((error) => {

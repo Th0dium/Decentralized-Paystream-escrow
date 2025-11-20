@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "./StreamMath.sol";
 
 /**
@@ -41,26 +41,26 @@ contract Paystream is AccessControl, ReentrancyGuard, Pausable {
         address company;
         address employee;
         IERC20 token;
-        uint256 totalAmount;      // Total funded by company
-        uint256 ratePerSecond;    // Unlocks per second
-        uint64 startTime;         // Stream start
-        uint64 stopTime;          // Stream end
-        uint64 lastWithdrawTime;  // Last withdrawal timestamp
-        uint256 withdrawn;        // Total withdrawn (payout + escrowed)
-        uint16 escrowBps;         // Basis points to lock (e.g., 3000 = 30%)
-        uint256 escrowed;         // Amount locked in escrow (waiting for milestone approval)
-        bool paused;              // Stream frozen
-        bool cancelled;           // Stream ended
+        uint256 totalAmount; // Total funded by company
+        uint256 ratePerSecond; // Unlocks per second
+        uint64 startTime; // Stream start
+        uint64 stopTime; // Stream end
+        uint64 lastWithdrawTime; // Last withdrawal timestamp
+        uint256 withdrawn; // Total withdrawn (payout + escrowed)
+        uint16 escrowBps; // Basis points to lock (e.g., 3000 = 30%)
+        uint256 escrowed; // Amount locked in escrow (waiting for milestone approval)
+        bool paused; // Stream frozen
+        bool cancelled; // Stream ended
     }
 
     struct Milestone {
         uint256 streamId;
-        address submitter;        // Employee who submitted
-        string ipfsHash;          // IPFS proof of work
-        uint256 amount;           // Amount being claimed
-        MilestoneStatus status;   // PENDING → APPROVED/REJECTED → CLAIMED
-        uint256 createdAt;        // Submission timestamp
-        uint256 approvedAt;       // Approval timestamp (0 if not approved)
+        address submitter; // Employee who submitted
+        string ipfsHash; // IPFS proof of work
+        uint256 amount; // Amount being claimed
+        MilestoneStatus status; // PENDING → APPROVED/REJECTED → CLAIMED
+        uint256 createdAt; // Submission timestamp
+        uint256 approvedAt; // Approval timestamp (0 if not approved)
     }
 
     // ============ State ============
@@ -286,7 +286,10 @@ contract Paystream is AccessControl, ReentrancyGuard, Pausable {
     function cancelStream(uint256 streamId) external nonReentrant {
         Stream storage s = streams[streamId];
         require(!s.cancelled, "already cancelled");
-        require(msg.sender == s.company || hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "not authorized");
+        require(
+            msg.sender == s.company || hasRole(DEFAULT_ADMIN_ROLE, msg.sender),
+            "not authorized"
+        );
 
         s.cancelled = true;
 
@@ -345,7 +348,13 @@ contract Paystream is AccessControl, ReentrancyGuard, Pausable {
         streamMilestones[streamId].push(milestoneId);
         employeeMilestones[msg.sender].push(milestoneId);
 
-        emit MilestoneSubmitted(milestoneId, streamId, msg.sender, ipfsHash, amount);
+        emit MilestoneSubmitted(
+            milestoneId,
+            streamId,
+            msg.sender,
+            ipfsHash,
+            amount
+        );
         return milestoneId;
     }
 
@@ -353,7 +362,9 @@ contract Paystream is AccessControl, ReentrancyGuard, Pausable {
      * @notice Auditor approves a milestone
      * @param milestoneId Milestone ID
      */
-    function approveMilestone(uint256 milestoneId) external onlyRole(AUDITOR_ROLE) {
+    function approveMilestone(
+        uint256 milestoneId
+    ) external onlyRole(AUDITOR_ROLE) {
         Milestone storage m = milestones[milestoneId];
         require(m.status == MilestoneStatus.PENDING, "not pending");
 
@@ -367,7 +378,9 @@ contract Paystream is AccessControl, ReentrancyGuard, Pausable {
      * @notice Auditor rejects a milestone (returns escrowed amount to available escrow)
      * @param milestoneId Milestone ID
      */
-    function rejectMilestone(uint256 milestoneId) external onlyRole(AUDITOR_ROLE) {
+    function rejectMilestone(
+        uint256 milestoneId
+    ) external onlyRole(AUDITOR_ROLE) {
         Milestone storage m = milestones[milestoneId];
         require(m.status == MilestoneStatus.PENDING, "not pending");
 
@@ -387,7 +400,9 @@ contract Paystream is AccessControl, ReentrancyGuard, Pausable {
      *
      * @param milestoneId Milestone ID
      */
-    function claimMilestone(uint256 milestoneId) external nonReentrant whenNotPaused {
+    function claimMilestone(
+        uint256 milestoneId
+    ) external nonReentrant whenNotPaused {
         Milestone storage m = milestones[milestoneId];
         require(m.status == MilestoneStatus.APPROVED, "not approved");
 
@@ -409,11 +424,7 @@ contract Paystream is AccessControl, ReentrancyGuard, Pausable {
      * @notice Get full stream details
      * @param streamId Stream ID
      */
-    function getStream(uint256 streamId)
-        external
-        view
-        returns (Stream memory)
-    {
+    function getStream(uint256 streamId) external view returns (Stream memory) {
         return streams[streamId];
     }
 
@@ -421,11 +432,9 @@ contract Paystream is AccessControl, ReentrancyGuard, Pausable {
      * @notice Get full milestone details
      * @param milestoneId Milestone ID
      */
-    function getMilestone(uint256 milestoneId)
-        external
-        view
-        returns (Milestone memory)
-    {
+    function getMilestone(
+        uint256 milestoneId
+    ) external view returns (Milestone memory) {
         return milestones[milestoneId];
     }
 
@@ -433,11 +442,9 @@ contract Paystream is AccessControl, ReentrancyGuard, Pausable {
      * @notice Get all milestone IDs for a stream
      * @param streamId Stream ID
      */
-    function getStreamMilestones(uint256 streamId)
-        external
-        view
-        returns (uint256[] memory)
-    {
+    function getStreamMilestones(
+        uint256 streamId
+    ) external view returns (uint256[] memory) {
         return streamMilestones[streamId];
     }
 
@@ -445,11 +452,9 @@ contract Paystream is AccessControl, ReentrancyGuard, Pausable {
      * @notice Get all milestone IDs for an employee
      * @param employee Employee address
      */
-    function getEmployeeMilestones(address employee)
-        external
-        view
-        returns (uint256[] memory)
-    {
+    function getEmployeeMilestones(
+        address employee
+    ) external view returns (uint256[] memory) {
         return employeeMilestones[employee];
     }
 
@@ -457,7 +462,9 @@ contract Paystream is AccessControl, ReentrancyGuard, Pausable {
      * @notice Get available escrowed amount for a stream
      * @param streamId Stream ID
      */
-    function getEscrowedAmount(uint256 streamId) external view returns (uint256) {
+    function getEscrowedAmount(
+        uint256 streamId
+    ) external view returns (uint256) {
         return streams[streamId].escrowed;
     }
 
