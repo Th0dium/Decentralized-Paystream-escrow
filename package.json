@@ -1,23 +1,26 @@
 {
-  "name": "decentralized-paystream-escrow",
+  "name": "flowpay-escrow",
   "version": "0.1.0",
-  "description": "Decentralized salary streaming and milestone escrow MVP",
+  "description": "Ethereum payroll streaming with milestone escrow",
   "main": "index.js",
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test",
-    "deploy": "hardhat run scripts/deploy.ts",
-    "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia",
-    "verify": "hardhat verify",
+    "test:watch": "hardhat test --watch",
+    "deploy": "hardhat run scripts/deploy.js",
+    "deploy:sepolia": "hardhat run scripts/deploy.js --network sepolia",
+    "deploy:mainnet": "hardhat run scripts/deploy.js --network mainnet",
     "clean": "hardhat clean",
-    "typecheck": "tsc --noEmit"
+    "coverage": "hardhat coverage",
+    "gas": "REPORT_GAS=true hardhat test"
   },
   "keywords": [
     "payroll",
-    "escrow",
     "streaming",
-    "blockchain",
-    "solidity"
+    "escrow",
+    "ethereum",
+    "solidity",
+    "web3"
   ],
   "author": "",
   "license": "MIT",
@@ -25,6 +28,7 @@
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.6",
     "@nomicfoundation/hardhat-ethers": "^3.0.6",
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.8",
     "@types/chai": "^4.3.14",
     "@types/mocha": ">=9.1.0",
     "chai": "^4.3.11",
