@@ -37,6 +37,8 @@ contract Paystream is ReentrancyGuard, AccessControl {
         uint256 escrowed; // Amount currently locked in escrow
         bool paused; // Stream-specific pause by company
         bool cancelled;
+        uint64 totalPausedDuration; // Cumulative duration of all completed pauses
+        uint64 pausedAt; // Timestamp when the current pause started (0 if not paused)
     }
 
     struct Milestone {
@@ -230,7 +232,9 @@ contract Paystream is ReentrancyGuard, AccessControl {
             escrowBps: escrowBps,
             escrowed: 0,
             paused: false,
-            cancelled: false
+            cancelled: false,
+            totalPausedDuration: 0,
+            pausedAt: 0
         });
 
         emit StreamCreated(
@@ -271,10 +275,24 @@ contract Paystream is ReentrancyGuard, AccessControl {
         Stream storage s = streams[streamId];
         require(s.company != address(0), "stream does not exist");
 
-        uint64 nowTs = uint64(block.timestamp);
-        uint64 elapsedSecs = StreamMath.elapsed(s.startTime, s.stopTime, nowTs);
-        uint256 accrued = (s.totalAmount * elapsedSecs) /
-            (s.stopTime - s.startTime);
+        uint64 now = uint64(block.timestamp);
+        if (now < s.startTime) return 0;
+
+        uint64 totalDuration = s.stopTime - s.startTime;
+        if (totalDuration == 0) return s.totalAmount - s.withdrawn;
+
+        uint64 rawElapsed = now > s.stopTime
+            ? totalDuration
+            : now - s.startTime;
+
+        uint64 currentPauseDuration = s.paused ? now - s.pausedAt : 0;
+        uint64 totalPausedTime = s.totalPausedDuration + currentPauseDuration;
+
+        uint64 workingTime = rawElapsed > totalPausedTime
+            ? rawElapsed - totalPausedTime
+            : 0;
+
+        uint256 accrued = (s.totalAmount * workingTime) / totalDuration;
         if (accrued > s.totalAmount) accrued = s.totalAmount;
 
         if (accrued <= s.withdrawn) return 0;
@@ -312,6 +330,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
         require(!s.paused, "already paused");
 
         s.paused = true;
+        s.pausedAt = uint64(block.timestamp);
         emit StreamPaused(streamId, msg.sender);
     }
 
@@ -321,7 +340,12 @@ contract Paystream is ReentrancyGuard, AccessControl {
         require(msg.sender == s.company, "not company");
         require(s.paused, "not paused");
 
+        uint64 pauseDuration = uint64(block.timestamp) - s.pausedAt;
+
         s.paused = false;
+        s.totalPausedDuration += pauseDuration;
+        s.pausedAt = 0;
+
         emit StreamResumed(streamId, msg.sender);
     }
 
@@ -446,9 +470,23 @@ contract Paystream is ReentrancyGuard, AccessControl {
         Stream storage s = streams[streamId];
 
         uint64 nowTs = uint64(block.timestamp);
-        uint64 elapsedSecs = StreamMath.elapsed(s.startTime, s.stopTime, nowTs);
-        uint256 accrued = (s.totalAmount * elapsedSecs) /
-            (s.stopTime - s.startTime);
+        if (now < s.startTime) return 0;
+
+        uint64 totalDuration = s.stopTime - s.startTime;
+        if (totalDuration == 0) return s.totalAmount;
+
+        uint64 rawElapsed = now > s.stopTime
+            ? totalDuration
+            : now - s.startTime;
+
+        uint64 currentPauseDuration = s.paused ? now - s.pausedAt : 0;
+        uint64 totalPausedTime = s.totalPausedDuration + currentPauseDuration;
+
+        uint64 workingTime = rawElapsed > totalPausedTime
+            ? rawElapsed - totalPausedTime
+            : 0;
+
+        uint256 accrued = (s.totalAmount * workingTime) / totalDuration;
         if (accrued > s.totalAmount) accrued = s.totalAmount;
 
         return accrued;
