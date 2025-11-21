@@ -40,13 +40,12 @@ contract Paystream is ReentrancyGuard, AccessControl {
     }
 
     struct Milestone {
-        uint256 streamId;
-        address submitter;
-        string ipfsHash;
-        uint256 amount;
-        MilestoneStatus status;
-        uint256 createdAt;
-        uint256 approvedAt;
+        uint256 streamId; // Which salary stream this belongs to
+        address submitter; // Employee who did the work
+        uint256 amount; // How much escrow they're claiming
+        MilestoneStatus status; // PENDING → APPROVED → CLAIMED
+        uint256 createdAt; // When submitted
+        uint256 approvedAt; // When auditor approved
     }
 
     // ============ State ============
@@ -73,7 +72,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
     // ============ Events ============
     event PlatformFeeUpdated(uint16 newFeeBps);
-    event FeeRecipientUpdated(address newRecipient);
+    event FeeRecipientUpdated(address indexed newRecipient);
     event NewStreamCreationPaused(bool status);
 
     event StreamAuditorAdded(uint256 indexed streamId, address indexed auditor);
@@ -112,7 +111,6 @@ contract Paystream is ReentrancyGuard, AccessControl {
         uint256 indexed milestoneId,
         uint256 indexed streamId,
         address indexed submitter,
-        string ipfsHash,
         uint256 amount
     );
     event MilestoneApproved(
@@ -286,6 +284,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
     function withdraw(uint256 streamId) external nonReentrant {
         Stream storage s = streams[streamId];
         require(s.company != address(0), "stream does not exist");
+        require(!s.cancelled, "stream cancelled");
         require(!s.paused, "stream paused");
         require(msg.sender == s.employee, "not employee");
 
@@ -334,16 +333,8 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
         s.cancelled = true;
 
-        uint64 nowTs = uint64(block.timestamp);
-        uint64 elapsedSecs = StreamMath.elapsed(s.startTime, s.stopTime, nowTs);
-        uint256 accrued = (s.totalAmount * elapsedSecs) /
-            (s.stopTime - s.startTime);
-        if (accrued > s.totalAmount) {
-            accrued = s.totalAmount;
-        }
-
-        uint256 refundAmount = s.totalAmount - accrued;
-
+        // The remaining unvested and unwithdrawn amount is refunded to the company.
+        uint256 refundAmount = s.totalAmount - s.withdrawn; // Corrected logic
         if (refundAmount > 0) {
             s.token.safeTransfer(s.company, refundAmount);
         }
@@ -355,7 +346,6 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
     function submitMilestone(
         uint256 streamId,
-        string calldata ipfsHash,
         uint256 amount
     ) external returns (uint256) {
         Stream storage s = streams[streamId];
@@ -363,13 +353,11 @@ contract Paystream is ReentrancyGuard, AccessControl {
         require(msg.sender == s.employee, "not employee");
         require(amount > 0, "amount must be > 0");
         require(amount <= s.escrowed, "exceeds available escrow");
-        require(bytes(ipfsHash).length > 0, "IPFS hash required");
 
         uint256 milestoneId = _nextMilestoneId++;
         milestones[milestoneId] = Milestone({
             streamId: streamId,
             submitter: msg.sender,
-            ipfsHash: ipfsHash,
             amount: amount,
             status: MilestoneStatus.PENDING,
             createdAt: block.timestamp,
@@ -379,13 +367,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
         streamMilestones[streamId].push(milestoneId);
         employeeMilestones[msg.sender].push(milestoneId);
 
-        emit MilestoneSubmitted(
-            milestoneId,
-            streamId,
-            msg.sender,
-            ipfsHash,
-            amount
-        );
+        emit MilestoneSubmitted(milestoneId, streamId, msg.sender, amount);
         return milestoneId;
     }
 
@@ -394,6 +376,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
         require(m.submitter != address(0), "milestone does not exist");
         require(m.status == MilestoneStatus.PENDING, "milestone not pending");
         require(isStreamAuditor[m.streamId][msg.sender], "not stream auditor");
+        require(msg.sender != m.submitter, "auditor cannot be submitter");
 
         m.status = MilestoneStatus.APPROVED;
         m.approvedAt = block.timestamp;
@@ -406,6 +389,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
         require(m.submitter != address(0), "milestone does not exist");
         require(m.status == MilestoneStatus.PENDING, "milestone not pending");
         require(isStreamAuditor[m.streamId][msg.sender], "not stream auditor");
+        require(msg.sender != m.submitter, "auditor cannot be submitter");
 
         m.status = MilestoneStatus.REJECTED;
 
