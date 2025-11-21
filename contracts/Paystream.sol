@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.8.24 <0.9.0;
+pragma solidity 0.8.24;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -29,7 +29,6 @@ contract Paystream is ReentrancyGuard, AccessControl {
         address employee;
         IERC20 token;
         uint256 totalAmount; // Total funded by company for the stream
-        uint256 ratePerSecond; // Unlocks per second
         uint64 startTime;
         uint64 stopTime;
         uint64 lastWithdrawTime;
@@ -176,16 +175,12 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
 
         // --- Stream Creation ---
-        uint64 duration = stopTime - startTime;
-        uint256 rate = totalAmount / duration;
-
         uint256 streamId = _nextStreamId++;
         streams[streamId] = Stream({
             company: msg.sender,
             employee: employee,
             token: erc20,
             totalAmount: totalAmount,
-            ratePerSecond: rate,
             startTime: startTime,
             stopTime: stopTime,
             lastWithdrawTime: startTime,
@@ -219,11 +214,10 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
     function claimable(uint256 streamId) public view returns (uint256) {
         Stream storage s = streams[streamId];
-        if (s.cancelled) return 0;
 
         uint64 nowTs = uint64(block.timestamp);
         uint64 elapsedSecs = StreamMath.elapsed(s.startTime, s.stopTime, nowTs);
-        uint256 accrued = s.ratePerSecond * elapsedSecs;
+        uint256 accrued = (s.totalAmount * elapsedSecs) / (s.stopTime - s.startTime);
         if (accrued > s.totalAmount) accrued = s.totalAmount;
 
         if (accrued <= s.withdrawn) return 0;
@@ -233,7 +227,6 @@ contract Paystream is ReentrancyGuard, AccessControl {
     function withdraw(uint256 streamId) external nonReentrant {
         Stream storage s = streams[streamId];
         require(!s.paused, "stream paused");
-        require(!s.cancelled, "stream cancelled");
         require(msg.sender == s.employee, "not employee");
 
         uint256 amount = claimable(streamId);
@@ -280,7 +273,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
         uint64 nowTs = uint64(block.timestamp);
         uint64 elapsedSecs = StreamMath.elapsed(s.startTime, s.stopTime, nowTs);
-        uint256 accrued = s.ratePerSecond * elapsedSecs;
+        uint256 accrued = (s.totalAmount * elapsedSecs) / (s.stopTime - s.startTime);
         if (accrued > s.totalAmount) {
             accrued = s.totalAmount;
         }
@@ -385,11 +378,10 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
     function getTotalEarned(uint256 streamId) external view returns (uint256) {
         Stream storage s = streams[streamId];
-        if (s.cancelled) return s.withdrawn;
 
         uint64 nowTs = uint64(block.timestamp);
         uint64 elapsedSecs = StreamMath.elapsed(s.startTime, s.stopTime, nowTs);
-        uint256 accrued = s.ratePerSecond * elapsedSecs;
+        uint256 accrued = (s.totalAmount * elapsedSecs) / (s.stopTime - s.startTime);
         if (accrued > s.totalAmount) accrued = s.totalAmount;
 
         return accrued;
