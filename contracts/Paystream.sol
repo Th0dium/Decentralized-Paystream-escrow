@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.30;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -72,7 +72,10 @@ contract Paystream is ReentrancyGuard, AccessControl {
     event NewStreamCreationPaused(bool status);
 
     event StreamAuditorAdded(uint256 indexed streamId, address indexed auditor);
-    event StreamAuditorRemoved(uint256 indexed streamId, address indexed auditor);
+    event StreamAuditorRemoved(
+        uint256 indexed streamId,
+        address indexed auditor
+    );
 
     event StreamCreated(
         uint256 indexed streamId,
@@ -86,15 +89,43 @@ contract Paystream is ReentrancyGuard, AccessControl {
         uint256 feeAmount
     );
 
-    event Withdrawn(uint256 indexed streamId, address indexed employee, uint256 payout, uint256 escrowed);
+    event Withdrawn(
+        uint256 indexed streamId,
+        address indexed employee,
+        uint256 payout,
+        uint256 escrowed
+    );
     event StreamPaused(uint256 indexed streamId, address indexed by);
     event StreamResumed(uint256 indexed streamId, address indexed by);
-    event StreamCancelled(uint256 indexed streamId, address indexed by, uint256 refunded);
+    event StreamCancelled(
+        uint256 indexed streamId,
+        address indexed by,
+        uint256 refunded
+    );
 
-    event MilestoneSubmitted(uint256 indexed milestoneId, uint256 indexed streamId, address indexed submitter, string ipfsHash, uint256 amount);
-    event MilestoneApproved(uint256 indexed milestoneId, uint256 indexed streamId, address indexed auditor);
-    event MilestoneRejected(uint256 indexed milestoneId, uint256 indexed streamId, address indexed auditor);
-    event MilestoneClaimed(uint256 indexed milestoneId, uint256 indexed streamId, address indexed employee, uint256 amount);
+    event MilestoneSubmitted(
+        uint256 indexed milestoneId,
+        uint256 indexed streamId,
+        address indexed submitter,
+        string ipfsHash,
+        uint256 amount
+    );
+    event MilestoneApproved(
+        uint256 indexed milestoneId,
+        uint256 indexed streamId,
+        address indexed auditor
+    );
+    event MilestoneRejected(
+        uint256 indexed milestoneId,
+        uint256 indexed streamId,
+        address indexed auditor
+    );
+    event MilestoneClaimed(
+        uint256 indexed milestoneId,
+        uint256 indexed streamId,
+        address indexed employee,
+        uint256 amount
+    );
 
     // ============ Constructor ============
     constructor() {
@@ -108,7 +139,9 @@ contract Paystream is ReentrancyGuard, AccessControl {
      * @notice Toggles the pause state for new stream creation.
      * @param status The new pause status.
      */
-    function setNewStreamPause(bool status) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setNewStreamPause(
+        bool status
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         newStreamsPaused = status;
         emit NewStreamCreationPaused(status);
     }
@@ -117,7 +150,9 @@ contract Paystream is ReentrancyGuard, AccessControl {
      * @notice Sets the platform fee.
      * @param newFeeBps The new fee in basis points.
      */
-    function setPlatformFee(uint16 newFeeBps) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setPlatformFee(
+        uint16 newFeeBps
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(newFeeBps <= 10000, "fee cannot exceed 10000");
         platformFeeBps = newFeeBps;
         emit PlatformFeeUpdated(newFeeBps);
@@ -127,12 +162,13 @@ contract Paystream is ReentrancyGuard, AccessControl {
      * @notice Sets the recipient for platform fees.
      * @param newRecipient The new address to receive fees.
      */
-    function setFeeRecipient(address newRecipient) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setFeeRecipient(
+        address newRecipient
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(newRecipient != address(0), "recipient cannot be zero");
         feeRecipient = newRecipient;
         emit FeeRecipientUpdated(newRecipient);
     }
-
 
     // ============ Stream Creation ============
     /**
@@ -173,7 +209,6 @@ contract Paystream is ReentrancyGuard, AccessControl {
         }
         erc20.safeTransferFrom(msg.sender, address(this), totalAmount);
 
-
         // --- Stream Creation ---
         uint256 streamId = _nextStreamId++;
         streams[streamId] = Stream({
@@ -191,7 +226,17 @@ contract Paystream is ReentrancyGuard, AccessControl {
             cancelled: false
         });
 
-        emit StreamCreated(streamId, msg.sender, employee, token, totalAmount, startTime, stopTime, escrowBps, feeAmount);
+        emit StreamCreated(
+            streamId,
+            msg.sender,
+            employee,
+            token,
+            totalAmount,
+            startTime,
+            stopTime,
+            escrowBps,
+            feeAmount
+        );
         return streamId;
     }
 
@@ -209,7 +254,6 @@ contract Paystream is ReentrancyGuard, AccessControl {
         emit StreamAuditorRemoved(streamId, auditor);
     }
 
-
     // ============ Core Stream Interaction (Withdraw, Pause, etc.) ============
 
     function claimable(uint256 streamId) public view returns (uint256) {
@@ -217,7 +261,8 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
         uint64 nowTs = uint64(block.timestamp);
         uint64 elapsedSecs = StreamMath.elapsed(s.startTime, s.stopTime, nowTs);
-        uint256 accrued = (s.totalAmount * elapsedSecs) / (s.stopTime - s.startTime);
+        uint256 accrued = (s.totalAmount * elapsedSecs) /
+            (s.stopTime - s.startTime);
         if (accrued > s.totalAmount) accrued = s.totalAmount;
 
         if (accrued <= s.withdrawn) return 0;
@@ -273,13 +318,14 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
         uint64 nowTs = uint64(block.timestamp);
         uint64 elapsedSecs = StreamMath.elapsed(s.startTime, s.stopTime, nowTs);
-        uint256 accrued = (s.totalAmount * elapsedSecs) / (s.stopTime - s.startTime);
+        uint256 accrued = (s.totalAmount * elapsedSecs) /
+            (s.stopTime - s.startTime);
         if (accrued > s.totalAmount) {
             accrued = s.totalAmount;
         }
 
         uint256 refundAmount = s.totalAmount - accrued;
-        
+
         if (refundAmount > 0) {
             s.token.safeTransfer(s.company, refundAmount);
         }
@@ -314,7 +360,13 @@ contract Paystream is ReentrancyGuard, AccessControl {
         streamMilestones[streamId].push(milestoneId);
         employeeMilestones[msg.sender].push(milestoneId);
 
-        emit MilestoneSubmitted(milestoneId, streamId, msg.sender, ipfsHash, amount);
+        emit MilestoneSubmitted(
+            milestoneId,
+            streamId,
+            msg.sender,
+            ipfsHash,
+            amount
+        );
         return milestoneId;
     }
 
@@ -360,19 +412,27 @@ contract Paystream is ReentrancyGuard, AccessControl {
         return streams[streamId];
     }
 
-    function getMilestone(uint256 milestoneId) external view returns (Milestone memory) {
+    function getMilestone(
+        uint256 milestoneId
+    ) external view returns (Milestone memory) {
         return milestones[milestoneId];
     }
-    
-    function getStreamMilestones(uint256 streamId) external view returns (uint256[] memory) {
+
+    function getStreamMilestones(
+        uint256 streamId
+    ) external view returns (uint256[] memory) {
         return streamMilestones[streamId];
     }
 
-    function getEmployeeMilestones(address employee) external view returns (uint256[] memory) {
+    function getEmployeeMilestones(
+        address employee
+    ) external view returns (uint256[] memory) {
         return employeeMilestones[employee];
     }
 
-    function getEscrowedAmount(uint256 streamId) external view returns (uint256) {
+    function getEscrowedAmount(
+        uint256 streamId
+    ) external view returns (uint256) {
         return streams[streamId].escrowed;
     }
 
@@ -381,7 +441,8 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
         uint64 nowTs = uint64(block.timestamp);
         uint64 elapsedSecs = StreamMath.elapsed(s.startTime, s.stopTime, nowTs);
-        uint256 accrued = (s.totalAmount * elapsedSecs) / (s.stopTime - s.startTime);
+        uint256 accrued = (s.totalAmount * elapsedSecs) /
+            (s.stopTime - s.startTime);
         if (accrued > s.totalAmount) accrued = s.totalAmount;
 
         return accrued;
