@@ -10,7 +10,6 @@ import "./StreamMath.sol";
 
 /**
  * @title Paystream
- * @notice Unified salary streaming and milestone-based escrow contract
  *
  * Flow:
  * 1. Company deposits funds → All locked in this contract
