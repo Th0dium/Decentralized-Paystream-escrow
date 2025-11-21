@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.24 <0.9.0;
 
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -8,10 +9,10 @@ import "./StreamMath.sol";
 
 /**
  * @title Paystream
- * @dev Core logic for streaming payments and milestone-based escrow.
- * Administrative functions are controlled by a separate admin contract.
+ * @dev A unified, single-deployment contract for streaming payments and milestone-based escrow.
+ * Administrative functions are controlled by the DEFAULT_ADMIN_ROLE.
  */
-contract Paystream is ReentrancyGuard {
+contract Paystream is ReentrancyGuard, AccessControl {
     using SafeERC20 for IERC20;
 
     // ============ Enums ============
@@ -62,20 +63,11 @@ contract Paystream is ReentrancyGuard {
     mapping(uint256 => mapping(address => bool)) public isStreamAuditor;
 
     // --- Admin-Controlled State ---
-    address public adminContract;
-    address private _deployer; // Temporary holder for deployer address
     bool public newStreamsPaused;
     uint16 public platformFeeBps;
     address public feeRecipient;
 
-    // ============ Modifiers ============
-    modifier onlyAdminContract() {
-        require(msg.sender == adminContract, "caller is not the admin contract");
-        _;
-    }
-
     // ============ Events ============
-    event AdminContractSet(address indexed adminContract);
     event PlatformFeeUpdated(uint16 newFeeBps);
     event FeeRecipientUpdated(address newRecipient);
     event NewStreamCreationPaused(bool status);
@@ -107,49 +99,37 @@ contract Paystream is ReentrancyGuard {
 
     // ============ Constructor ============
     constructor() {
-        _deployer = msg.sender;
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         platformFeeBps = 5; // Default 0.05%
         feeRecipient = msg.sender; // Default to deployer
     }
 
-    // ============ Admin Setup ============
+    // ============ Admin Functions ============
     /**
-     * @notice Sets the administrative contract address. Can only be called once by the deployer.
-     * @param _adminContract The address of the PaystreamAdmin contract.
-     */
-    function setAdminContract(address _adminContract) external {
-        require(msg.sender == _deployer, "only deployer can set admin");
-        require(adminContract == address(0), "admin contract already set");
-        require(_adminContract != address(0), "admin contract cannot be zero");
-        adminContract = _adminContract;
-        _deployer = address(0); // Revoke deployer's permission
-        emit AdminContractSet(_adminContract);
-    }
-
-    // ============ Admin-Callable Functions ============
-    /**
-     * @notice Toggles the pause state for new stream creation. Called by admin contract.
+     * @notice Toggles the pause state for new stream creation.
      * @param status The new pause status.
      */
-    function setNewStreamPause(bool status) public onlyAdminContract {
+    function setNewStreamPause(bool status) external onlyRole(DEFAULT_ADMIN_ROLE) {
         newStreamsPaused = status;
         emit NewStreamCreationPaused(status);
     }
 
     /**
-     * @notice Sets the platform fee. Called by admin contract.
+     * @notice Sets the platform fee.
      * @param newFeeBps The new fee in basis points.
      */
-    function setPlatformFee(uint16 newFeeBps) public onlyAdminContract {
+    function setPlatformFee(uint16 newFeeBps) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(newFeeBps <= 10000, "fee cannot exceed 10000");
         platformFeeBps = newFeeBps;
         emit PlatformFeeUpdated(newFeeBps);
     }
 
     /**
-     * @notice Sets the recipient for platform fees. Called by admin contract.
+     * @notice Sets the recipient for platform fees.
      * @param newRecipient The new address to receive fees.
      */
-    function setFeeRecipient(address newRecipient) public onlyAdminContract {
+    function setFeeRecipient(address newRecipient) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(newRecipient != address(0), "recipient cannot be zero");
         feeRecipient = newRecipient;
         emit FeeRecipientUpdated(newRecipient);
     }
@@ -221,12 +201,6 @@ contract Paystream is ReentrancyGuard {
     }
 
     // ============ Stream-Specific Auditor Management ============
-    /**
-     * @notice Adds an auditor for a specific stream.
-     * @dev Only the company that created the stream can call this.
-     * @param streamId The stream to add an auditor to.
-     * @param auditor The address of the auditor.
-     */
     function addStreamAuditor(uint256 streamId, address auditor) external {
         require(streams[streamId].company == msg.sender, "not stream company");
         require(auditor != address(0), "auditor address cannot be zero");
@@ -234,12 +208,6 @@ contract Paystream is ReentrancyGuard {
         emit StreamAuditorAdded(streamId, auditor);
     }
 
-    /**
-     * @notice Removes an auditor from a specific stream.
-     * @dev Only the company that created the stream can call this.
-     * @param streamId The stream to remove an auditor from.
-     * @param auditor The address of the auditor.
-     */
     function removeStreamAuditor(uint256 streamId, address auditor) external {
         require(streams[streamId].company == msg.sender, "not stream company");
         isStreamAuditor[streamId][auditor] = false;
@@ -313,19 +281,17 @@ contract Paystream is ReentrancyGuard {
         uint64 nowTs = uint64(block.timestamp);
         uint64 elapsedSecs = StreamMath.elapsed(s.startTime, s.stopTime, nowTs);
         uint256 accrued = s.ratePerSecond * elapsedSecs;
-        if (accrued > s.totalAmount) accrued = s.totalAmount;
-
-        uint256 owed = 0;
-        if (accrued > s.withdrawn) {
-            owed = accrued - s.withdrawn;
+        if (accrued > s.totalAmount) {
+            accrued = s.totalAmount;
         }
 
-        if (owed > 0) {
-            s.withdrawn += owed;
-            s.token.safeTransfer(s.company, owed);
+        uint256 refundAmount = s.totalAmount - accrued;
+        
+        if (refundAmount > 0) {
+            s.token.safeTransfer(s.company, refundAmount);
         }
 
-        emit StreamCancelled(streamId, msg.sender, owed);
+        emit StreamCancelled(streamId, msg.sender, refundAmount);
     }
 
     // ============ Milestone Management ============
@@ -405,7 +371,6 @@ contract Paystream is ReentrancyGuard {
         return milestones[milestoneId];
     }
     
-    // ... other view functions from original contract are fine ...
     function getStreamMilestones(uint256 streamId) external view returns (uint256[] memory) {
         return streamMilestones[streamId];
     }
