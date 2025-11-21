@@ -45,15 +45,14 @@ This document outlines the core architectural decisions made during the developm
 
 ---
 
-### 4. Pause Mechanism with Duration Extension
+### 4. Pause Mechanism with "Working Time" Calculation
 
-**Decision:** When a stream is paused, the vesting clock is frozen. The stream's `stopTime` is extended by the duration of the pause when it is resumed.
+**Decision:** When a stream is paused, the vesting clock is frozen by tracking cumulative "dead time". The `stopTime` of the stream remains fixed. The amount earned is calculated based on the actual "working time".
 
 **Rationale:**
-*   **Fairness:** This ensures that pausing a stream does not penalize the employee by causing them to lose out on vested funds. The total active duration of the stream remains the same as originally agreed.
+*   **Fairness & Predictability:** This ensures that pausing a stream does not penalize the employee. The `stopTime` remains constant, which simplifies off-chain tracking and UI display, while the internal logic correctly calculates the vested amount based on non-paused periods.
 
 **Implementation:**
-*   The `Stream` struct includes a `pauseStartTime` to record when a pause begins.
-*   `resumeStream` calculates the `pauseDuration` and adds it to `s.stopTime`.
-*   The `claimable` function is aware of the `paused` state and calculates earnings based on `pauseStartTime` if the stream is currently paused.
-
+*   The `Stream` struct contains `totalPausedDuration` (a running total of completed pauses) and `pausedAt` (the timestamp of the current pause, if active).
+*   `resumeStream` calculates the duration of the just-ended pause and adds it to `totalPausedDuration`.
+*   The `claimable` function calculates `workingTime` by subtracting the total paused time (both completed and current) from the total time elapsed since the stream started. This `workingTime` is then used to determine the vested amount.

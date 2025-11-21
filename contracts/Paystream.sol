@@ -5,7 +5,6 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "./StreamMath.sol";
 
 /**
  * @title Paystream
@@ -470,16 +469,16 @@ contract Paystream is ReentrancyGuard, AccessControl {
         Stream storage s = streams[streamId];
 
         uint64 nowTs = uint64(block.timestamp);
-        if (now < s.startTime) return 0;
+        if (nowTs < s.startTime) return 0;
 
         uint64 totalDuration = s.stopTime - s.startTime;
         if (totalDuration == 0) return s.totalAmount;
 
-        uint64 rawElapsed = now > s.stopTime
+        uint64 rawElapsed = nowTs > s.stopTime
             ? totalDuration
-            : now - s.startTime;
+            : nowTs - s.startTime;
 
-        uint64 currentPauseDuration = s.paused ? now - s.pausedAt : 0;
+        uint64 currentPauseDuration = s.paused ? nowTs - s.pausedAt : 0;
         uint64 totalPausedTime = s.totalPausedDuration + currentPauseDuration;
 
         uint64 workingTime = rawElapsed > totalPausedTime
