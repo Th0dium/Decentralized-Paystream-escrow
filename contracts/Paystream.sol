@@ -66,6 +66,11 @@ contract Paystream is ReentrancyGuard, AccessControl {
     uint16 public platformFeeBps;
     address public feeRecipient;
 
+    // --- Validation Bounds ---
+    uint256 public constant MIN_STREAM_DURATION = 1 days;
+    uint256 public constant MAX_STREAM_DURATION = 365 days;
+    uint256 public constant MIN_STREAM_AMOUNT = 1000; // 0.000000000001 tokens (wei)
+
     // ============ Events ============
     event PlatformFeeUpdated(uint16 newFeeBps);
     event FeeRecipientUpdated(address newRecipient);
@@ -192,8 +197,12 @@ contract Paystream is ReentrancyGuard, AccessControl {
         require(!newStreamsPaused, "stream creation is paused");
         require(employee != address(0), "invalid employee");
         require(token != address(0), "invalid token");
-        require(totalAmount > 0, "amount must be > 0");
+        require(totalAmount >= MIN_STREAM_AMOUNT, "amount too small");
         require(stopTime > startTime, "stop time must be after start time");
+
+        uint64 duration = stopTime - startTime;
+        require(duration >= MIN_STREAM_DURATION, "duration too short");
+        require(duration <= MAX_STREAM_DURATION, "duration too long");
         require(escrowBps <= 10000, "escrow bps cannot exceed 10000");
 
         // --- Fee Calculation ---
@@ -242,14 +251,18 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
     // ============ Stream-Specific Auditor Management ============
     function addStreamAuditor(uint256 streamId, address auditor) external {
-        require(streams[streamId].company == msg.sender, "not stream company");
+        Stream storage s = streams[streamId];
+        require(s.company != address(0), "stream does not exist");
+        require(msg.sender == s.company, "not stream company");
         require(auditor != address(0), "auditor address cannot be zero");
         isStreamAuditor[streamId][auditor] = true;
         emit StreamAuditorAdded(streamId, auditor);
     }
 
     function removeStreamAuditor(uint256 streamId, address auditor) external {
-        require(streams[streamId].company == msg.sender, "not stream company");
+        Stream storage s = streams[streamId];
+        require(s.company != address(0), "stream does not exist");
+        require(msg.sender == s.company, "not stream company");
         isStreamAuditor[streamId][auditor] = false;
         emit StreamAuditorRemoved(streamId, auditor);
     }
@@ -258,6 +271,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
     function claimable(uint256 streamId) public view returns (uint256) {
         Stream storage s = streams[streamId];
+        require(s.company != address(0), "stream does not exist");
 
         uint64 nowTs = uint64(block.timestamp);
         uint64 elapsedSecs = StreamMath.elapsed(s.startTime, s.stopTime, nowTs);
@@ -271,6 +285,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
     function withdraw(uint256 streamId) external nonReentrant {
         Stream storage s = streams[streamId];
+        require(s.company != address(0), "stream does not exist");
         require(!s.paused, "stream paused");
         require(msg.sender == s.employee, "not employee");
 
@@ -293,6 +308,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
     function pauseStream(uint256 streamId) external {
         Stream storage s = streams[streamId];
+        require(s.company != address(0), "stream does not exist");
         require(msg.sender == s.company, "not company");
         require(!s.paused, "already paused");
 
@@ -302,6 +318,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
     function resumeStream(uint256 streamId) external {
         Stream storage s = streams[streamId];
+        require(s.company != address(0), "stream does not exist");
         require(msg.sender == s.company, "not company");
         require(s.paused, "not paused");
 
@@ -311,6 +328,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
     function cancelStream(uint256 streamId) external nonReentrant {
         Stream storage s = streams[streamId];
+        require(s.company != address(0), "stream does not exist");
         require(!s.cancelled, "already cancelled");
         require(msg.sender == s.company, "not company");
 
@@ -341,6 +359,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
         uint256 amount
     ) external returns (uint256) {
         Stream storage s = streams[streamId];
+        require(s.company != address(0), "stream does not exist");
         require(msg.sender == s.employee, "not employee");
         require(amount > 0, "amount must be > 0");
         require(amount <= s.escrowed, "exceeds available escrow");
@@ -372,6 +391,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
     function approveMilestone(uint256 milestoneId) external {
         Milestone storage m = milestones[milestoneId];
+        require(m.submitter != address(0), "milestone does not exist");
         require(m.status == MilestoneStatus.PENDING, "milestone not pending");
         require(isStreamAuditor[m.streamId][msg.sender], "not stream auditor");
 
@@ -383,6 +403,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
     function rejectMilestone(uint256 milestoneId) external {
         Milestone storage m = milestones[milestoneId];
+        require(m.submitter != address(0), "milestone does not exist");
         require(m.status == MilestoneStatus.PENDING, "milestone not pending");
         require(isStreamAuditor[m.streamId][msg.sender], "not stream auditor");
 
@@ -393,6 +414,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
     function claimMilestone(uint256 milestoneId) external nonReentrant {
         Milestone storage m = milestones[milestoneId];
+        require(m.submitter != address(0), "milestone does not exist");
         require(m.status == MilestoneStatus.APPROVED, "milestone not approved");
 
         Stream storage s = streams[m.streamId];
