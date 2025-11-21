@@ -1,526 +1,220 @@
-# FlowPay - Architecture & Development Notes
+# Paystream - Architecture & Development Notes
 
 ## Project Overview
-Decentralized salary streaming & milestone-based escrow system on Ethereum.
+A unified, single-deployment smart contract for decentralized salary streaming and milestone-based escrow on EVM-compatible chains.
 
 **Key Features:**
-- ✅ Second-by-second salary streaming
-- ✅ Configurable escrow locking (basis points)
-- ✅ Milestone-based fund release (auditor approved)
-- ✅ Multi-token support (USDC, DAI, USDT, etc.)
-- ✅ Stream pause/resume/cancel
-- ✅ Role-based access control
+- ✅ Single, shared contract for all users.
+- ✅ Second-by-second payment streaming.
+- ✅ Per-stream configurable escrow for milestone-based payments.
+- ✅ Milestone workflow (submit, approve, reject, claim).
+- ✅ Multi-token support (any ERC20).
+- ✅ Stream-level controls: pause, resume, and cancellation by the company.
+- ✅ Platform-level controls: emergency pause for new streams and platform fee management by an admin.
 
 ---
 
 ## Architecture
 
-### Contract Structure (Composition Pattern)
+### Unified Contract Model
+
+The entire system is encapsulated within a single contract: `Paystream.sol`. This monolithic design was chosen for simplicity of deployment and interaction, reducing complexity and potential points of failure between contracts. All state, including streams and milestones, is managed within this one contract.
 
 ```
 ┌─────────────────────────────────────────┐
-│         PaystreamCore.sol               │ ← Main entry point
-│   (Streaming logic + Coordination)      │
+│              Paystream.sol              │
+│ (Unified Streaming & Escrow Logic)      │
 ├─────────────────────────────────────────┤
-│ • createStream()                        │
-│ • withdraw()                            │
-│ • cancelStream()                        │
-│ • sweepToken() [admin]                  │
-└────────┬─────────────────────┬──────────┘
-         │                     │
-    Uses │                     │ References
-         ↓                     ↓
-    ┌──────────────┐    ┌──────────────────┐
-    │ StreamMath   │    │ MilestoneEscrow  │
-    │  (Library)   │    │   (Contract)     │
-    └──────────────┘    └──────────────────┘
-    • elapsed()         • lockEscrow()
-    • available()       • releaseEscrow()
-                        • lockedAmount()
+│                                         │
+│  ====== Global State & Admin ======     │
+│  • Platform Fee, Fee Recipient          │
+│  • Emergency Pause (for new streams)    │
+│                                         │
+│  ====== Core Logic (Streams) ======     │
+│  • Stream Creation & Funding            │
+│  • Withdrawals (Payout + Escrow)        │
+│  • Cancellation, Pause/Resume           │
+│                                         │
+│  ====== Core Logic (Milestones) ======  │
+│  • Milestone Submission & Approval      │
+│  • Milestone Claiming                   │
+│                                         │
+└─────────────────────────────────────────┘
 ```
 
 ### Key Design Decisions
 
-#### 1. **Composition Over Inheritance**
-- PaystreamCore **references** MilestoneEscrow (not inherits)
-- Allows independent deployment & upgrades
-- Easier testing (can mock escrow)
-- Clean one-way dependency flow
+#### 1. **Unified Contract for Simplicity**
+- A single `Paystream.sol` contract manages all logic and state.
+- Eliminates the need for contract-to-contract calls for core features (e.g., locking escrow), reducing gas costs and attack surface.
+- Simplifies deployment and administration.
 
-#### 2. **Multi-Token Support**
-Each stream stores its own token address:
-```solidity
-struct Stream {
-    IERC20 token;  // Per-stream token selection
-    // ...
-}
-```
-- Companies can pay in USDC, DAI, USDT, etc.
-- Single deployment supports all ERC20s
-- Future: Add token whitelist for security
+#### 2. **Decentralized Roles**
+- **`DEFAULT_ADMIN_ROLE`**: A single admin role for platform health. Can pause new stream creation in an emergency and manage platform fees.
+- **`Company`**: The `msg.sender` who creates and funds a stream. Manages that specific stream (pause, cancel, add auditors).
+- **`Employee`**: The recipient of a stream. Can withdraw funds and manage milestones.
+- **`Stream Auditor`**: An address granted permission by a `Company` to approve/reject milestones *for a specific stream only*.
 
-#### 3. **Flexible Escrow Percentage**
-```solidity
-uint16 escrowBps;  // basis points (10000 = 100%)
-```
-- Default: 3000 bps (30% escrow)
-- Can be customized per stream
-- Configurable at stream creation time
+#### 3. **Flexible Escrow & Fees**
+- **Escrow**: The `escrowBps` (basis points) is set per-stream at creation, allowing companies to decide how much of the streamed payment is subject to milestone approval.
+- **Platform Fee**: A small, admin-configurable fee (`platformFeeBps`) is taken on stream creation to sustain the platform.
 
 #### 4. **Time-Based Accrual**
-```solidity
-uint256 accrued = ratePerSecond * elapsedSecs;
-```
-- Linear streaming (no cliff)
-- Per-second calculations
-- Minimal gas (library functions)
-
-#### 5. **Separated Roles**
-- **PaystreamCore**: Company/Employee roles (stream management)
-- **MilestoneEscrow**: Manager/Auditor roles (fund release)
+- The `StreamMath.sol` library is used for gas-efficient calculation of streamed funds based on elapsed time.
+- Payouts are linear and accrue per second.
 
 ---
 
-## Critical Components
+## Critical Components in `Paystream.sol`
 
-### PaystreamCore
-
-**Key Functions:**
+### State Structs
 ```solidity
-// Create stream (company funds it)
-createStream(employee, token, amount, startTime, stopTime, escrowBps)
-    → Returns streamId
-
-// Check how much employee can withdraw
-claimable(streamId)
-    → Returns unlocked - withdrawn
-
-// Withdraw (splits into payout + escrow)
-withdraw(streamId)
-    → Transfer escrow to MilestoneEscrow
-    → Transfer payout to employee
-
-// Cancel stream (refund unlocked remainder)
-cancelStream(streamId)
-    → Stops accrual
-    → Refunds unlocked amount to company
-    → Leaves escrow in MilestoneEscrow
-
-// Admin: Swap escrow contract
-setMilestoneEscrow(newEscrowAddress)
-```
-
-**State Tracking:**
-```solidity
-Stream {
-    company,                    // Stream creator
-    employee,                   // Recipient
-    token,                      // ERC20 address
-    totalAmount,               // Total funded
-    ratePerSecond,             // unlocks per second
-    startTime, stopTime,       // Duration window
-    lastWithdrawTime,          // Last withdrawal timestamp
-    withdrawn,                 // Total distributed (includes escrow)
-    escrowBps,                 // Escrow % (basis points)
-    paused,                    // Stream frozen flag
-    cancelled,                 // Stream ended flag
-    lockedInEscrow             // Total locked in escrow contract
+struct Stream {
+    address company;
+    address employee;
+    IERC20 token;
+    uint256 totalAmount; // Total funded for the stream
+    uint64 startTime;
+    uint64 stopTime;
+    uint256 withdrawn;   // Total "earned" by employee (payout + escrowed)
+    uint16 escrowBps;    // % of stream to lock in escrow
+    uint256 escrowed;    // Current balance locked in escrow
+    bool paused;         // Stream-specific pause
+    bool cancelled;
 }
-```
-
-### MilestoneEscrow
-
-**Current Functions:**
-```solidity
-// Called by PaystreamCore when employee withdraws
-lockEscrow(streamId, token, amount)
-    → Requires MANAGER_ROLE
-    → Updates _locked[streamId][token]
-
-// Called by auditor to release milestone funds
-releaseEscrow(streamId, token, to, amount)
-    → Requires AUDITOR_ROLE
-    → Transfers tokens to recipient
-
-// View locked amount for a stream
-lockedAmount(streamId, token)
-    → Returns locked balance
-```
-
-**State Tracking:**
-```solidity
-_locked[streamId][token] = amount  // Escrowed funds per stream/token
-```
-
-### StreamMath (Library)
-
-**Pure Functions:**
-```solidity
-// Calculate elapsed seconds (clamped by stop time)
-elapsed(start, stop, timestamp)
-    → Returns seconds elapsed
-
-// Calculate available amount from rate
-available(ratePerSecond, secondsElapsed)
-    → Returns amount unlocked
-```
-
----
-
-## Missing / Incomplete Features
-
-### ⚠️ HIGH PRIORITY
-
-#### 1. **Milestone Workflow (Not Implemented)**
-MilestoneEscrow lacks:
-- Milestone submission (employee submits proof)
-- Milestone approval (auditor reviews & approves)
-- Milestone rejection (auditor rejects, returns to escrow)
-- Milestone claiming (employee claims released funds)
-
-**Needed Structure:**
-```solidity
-enum MilestoneStatus { PENDING, APPROVED, REJECTED, CLAIMED }
 
 struct Milestone {
     uint256 streamId;
-    address submitter;      // Employee
-    string ipfsHash;       // Proof of work
-    uint256 amount;        // Amount to release
-    MilestoneStatus status;
-    uint256 createdAt;
-    uint256 approvedAt;
-}
-
-// Functions to add:
-function submitMilestone(uint256 streamId, string ipfsHash, uint256 amount)
-function approveMilestone(uint256 milestoneId)
-function rejectMilestone(uint256 milestoneId)
-function claimMilestone(uint256 milestoneId)
-function getMilestones(uint256 streamId)
-```
-
-#### 2. **Stream Pause/Resume (Incomplete)**
-PaystreamCore checks `paused` flag but no functions to set it:
-```solidity
-// Missing in PaystreamCore:
-function pauseStream(uint256 streamId) external {
-    require(msg.sender == streams[streamId].company);
-    streams[streamId].paused = true;
-}
-
-function resumeStream(uint256 streamId) external {
-    require(msg.sender == streams[streamId].company);
-    streams[streamId].paused = false;
+    address submitter;
+    string ipfsHash;
+    uint256 amount;
+    MilestoneStatus status; // PENDING, APPROVED, REJECTED, CLAIMED
+    // ... timestamps
 }
 ```
 
-### ⚠️ MEDIUM PRIORITY
+### Key Functions
 
-#### 3. **Token Whitelist (Security)**
-Currently accepts any ERC20:
+**Admin Functions:**
 ```solidity
-// Add:
-mapping(address => bool) public supportedTokens;
+// Emergency pause on new streams
+setNewStreamPause(bool status)
 
-function addSupportedToken(address token) external onlyRole(DEFAULT_ADMIN_ROLE) {
-    supportedTokens[token] = true;
-}
-
-// In createStream:
-require(supportedTokens[token], "Token not whitelisted");
+// Manage platform fees
+setPlatformFee(uint16 newFeeBps)
+setFeeRecipient(address newRecipient)
 ```
 
-#### 4. **System-Wide Emergency Pause**
-Add `Pausable` from OpenZeppelin for emergencies:
+**Core Stream Functions:**
 ```solidity
-import "@openzeppelin/contracts/security/Pausable.sol";
+// Create and fund a new stream
+createStream(employee, token, totalAmount, startTime, stopTime, escrowBps)
 
-contract PaystreamCore is AccessControl, ReentrancyGuard, Pausable {
-    function withdraw(...) external nonReentrant whenNotPaused {
-        // ...
-    }
-}
+// Employee withdraws available funds
+withdraw(streamId)
+    → Splits funds into direct payout and escrow balance
+
+// Company manages the stream
+pauseStream(streamId)
+resumeStream(streamId)
+cancelStream(streamId) // FIXED: Now correctly refunds the entire remaining balance
+addStreamAuditor(streamId, auditor)
 ```
 
-#### 5. **Input Validation & Bounds**
-Add limits to prevent issues:
+**Milestone Functions:**
 ```solidity
-uint256 public constant MIN_STREAM_DURATION = 1 days;
-uint256 public constant MAX_STREAM_DURATION = 365 days;
-uint256 public constant MIN_STREAM_AMOUNT = 1000; // wei
+// Employee submits work for approval
+submitMilestone(streamId, ipfsHash, amount)
 
-// In createStream:
-require(duration >= MIN_STREAM_DURATION, "Duration too short");
-require(duration <= MAX_STREAM_DURATION, "Duration too long");
-require(totalAmount >= MIN_STREAM_AMOUNT, "Amount too small");
+// Auditor reviews the milestone
+approveMilestone(milestoneId)
+rejectMilestone(milestoneId)
+
+// Employee claims the approved milestone funds
+claimMilestone(milestoneId)
 ```
-
-### ⚠️ LOWER PRIORITY (Security Hardening)
-
-#### 6. **sweepToken() Safety**
-Currently allows admin to drain any token:
-```solidity
-// Current (dangerous):
-function sweepToken(address token, address to, uint256 amount)
-    external onlyRole(DEFAULT_ADMIN_ROLE) {
-    IERC20(token).safeTransfer(to, amount);
-}
-
-// Better: Only allow sweeping tokens NOT in active streams
-// Or: Remove and handle differently
-```
-
-#### 7. **setMilestoneEscrow() One-Time Lock**
-Can be called multiple times, breaking existing locks:
-```solidity
-// Add:
-bool private _escrowSet = false;
-
-function setMilestoneEscrow(address escrowAddress)
-    external onlyRole(DEFAULT_ADMIN_ROLE) {
-    require(!_escrowSet, "Escrow already set");
-    // Validate escrow address is contract
-    require(escrowAddress.code.length > 0, "Not a contract");
-    milestoneEscrow = MilestoneEscrow(escrowAddress);
-    _escrowSet = true;
-}
-```
-
-#### 8. **Integer Division Dust**
-Stream creation loses remainder wei:
-```solidity
-uint256 rate = totalAmount / duration;  // loses remainder
-// Example: 100 / 3 = 33, only 99 wei will stream
-```
-Not critical but could handle with dust at stream end.
 
 ---
 
-## Setup & Development
+## Feature Status
 
-### Environment Setup
+### ✅ Completed Features
+- **Unified Contract**: The entire system is in `Paystream.sol`.
+- **Milestone Workflow**: Full lifecycle (submit, approve, reject, claim) is implemented.
+- **Stream Management**: Create, withdraw, pause, resume, and cancel are implemented.
+- **`cancelStream` Bug Fix**: The function now correctly refunds the entire remaining balance (`totalAmount - withdrawn + escrowed`), preventing locked funds.
+- **Platform Admin Controls**: Emergency pause and fee management are implemented.
+- **Stream-Specific Auditors**: Companies can assign auditors to their own streams.
 
-1. **Copy .env.example to .env:**
-   ```bash
-   cp .env.example .env
-   ```
+### ⚠️ Medium Priority (Future Improvements)
 
-2. **Fill in values:**
-   ```
-   SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/YOUR_PROJECT_ID
-   PRIVATE_KEY=your_private_key_without_0x
-   REPORT_GAS=true
-   ETHERSCAN_API_KEY=your_api_key
-   ```
+#### 1. **Token Whitelist (Security)**
+- Currently accepts any ERC20. A whitelist would prevent malicious or fake tokens.
+```solidity
+// Add:
+mapping(address => bool) public supportedTokens;
+// And check in createStream()
+```
 
-3. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+#### 2. **Input Validation & Bounds**
+- Add constraints to prevent streams that are too short, too long, or for dust amounts.
+```solidity
+// Add constants like:
+uint256 public constant MIN_STREAM_DURATION = 1 days;
+uint256 public constant MAX_STREAM_AMOUNT = 1000; // e.g., in wei
+```
+
+### ⚠️ Lower Priority (Hardening)
+
+#### 3. **Event for Admin Changes**
+- `setNewStreamPause` is missing an event. Other admin functions have them. Add `emit NewStreamCreationPaused(status);` for better off-chain tracking. (Correction: This event already exists).
+
+#### 4. **Integer Division Dust**
+- When calculating accrued amounts, there can be rounding errors leaving tiny "dust" amounts in the contract. This is a minor issue but could be handled by a sweep function for ended streams.
+
+---
+
+## Setup & Deployment
+
+### Environment
+Ensure `.env` is configured with an RPC URL and private key.
 
 ### Compilation & Testing
-
 ```bash
 # Compile contracts
 npm run compile
 
 # Run tests
 npm run test
-
-# Run tests with gas reporting
-REPORT_GAS=true npm run test
-
-# Type check TypeScript
-npm run typecheck
 ```
 
 ### Deployment
-
+The deployment process is now much simpler.
 ```bash
 # Local hardhat network
 npm run deploy
 
 # Sepolia testnet (requires .env)
 npm run deploy:sepolia
-
-# Verify on Etherscan
-npm run verify
 ```
+The deploy script in `scripts/deploy.ts` should be updated to deploy only the `Paystream.sol` contract.
 
 ---
 
-## Deployment Order
+## Architecture Scorecard
 
-1. **MilestoneEscrow** (standalone, no dependencies)
-   ```bash
-   → Address: 0x...
-   ```
+### Strengths ✅
+1.  **Simplicity**: Unified contract is easy to deploy, manage, and interact with.
+2.  **Gas Efficiency**: No cross-contract calls for core operations like withdrawals.
+3.  **Clear & Decentralized Roles**: Strong separation between platform admin and stream-level participants.
+4.  **Complete Feature Set**: Implements the full streaming and milestone escrow workflow.
+5.  **Secure**: Uses `ReentrancyGuard` and `SafeERC20`, and the critical `cancelStream` bug has been fixed.
 
-2. **PaystreamCore** (references MilestoneEscrow)
-   ```bash
-   → Constructor: (milestoneEscrowAddress)
-   → Address: 0x...
-   ```
+### Weaknesses / Areas for Improvement ⚠️
+1.  **No Token Whitelist**: Potential for users to be tricked with fake ERC20 tokens.
+2.  **Rigidity**: A single contract is harder to upgrade. A future version might consider a proxy pattern if significant changes are needed.
 
-3. **Set Roles** (Post-deployment)
-   - Grant `MANAGER_ROLE` to PaystreamCore in MilestoneEscrow
-   - Grant `AUDITOR_ROLE` to auditor wallet in MilestoneEscrow
-
-### Example Deploy Script
-
-```javascript
-// scripts/deploy.ts
-async function main() {
-    // 1. Deploy MilestoneEscrow
-    const MilestoneEscrow = await ethers.getContractFactory("MilestoneEscrow");
-    const escrow = await MilestoneEscrow.deploy();
-    await escrow.deployed();
-    console.log("MilestoneEscrow:", escrow.address);
-
-    // 2. Deploy PaystreamCore with escrow address
-    const PaystreamCore = await ethers.getContractFactory("PaystreamCore");
-    const core = await PaystreamCore.deploy(escrow.address);
-    await core.deployed();
-    console.log("PaystreamCore:", core.address);
-
-    // 3. Grant roles
-    await escrow.grantRole(
-        ethers.id("MANAGER_ROLE"),
-        core.address
-    );
-    console.log("Granted MANAGER_ROLE to PaystreamCore");
-}
-
-main();
-```
-
----
-
-## Testing Strategy
-
-### Unit Tests Needed
-
-1. **PaystreamCore**
-   - [ ] Stream creation (valid/invalid params)
-   - [ ] Claimable calculations (time-based)
-   - [ ] Withdrawals (escrow split)
-   - [ ] Stream cancellation
-   - [ ] Pause/resume (once implemented)
-   - [ ] Access control
-
-2. **MilestoneEscrow**
-   - [ ] Lock escrow (MANAGER_ROLE)
-   - [ ] Release escrow (AUDITOR_ROLE)
-   - [ ] View locked amounts
-   - [ ] Milestone workflow (once implemented)
-   - [ ] Access control
-
-3. **StreamMath**
-   - [ ] elapsed() time calculations
-   - [ ] available() amount calculations
-   - [ ] Edge cases (start=stop, before start, after stop)
-
-4. **Integration**
-   - [ ] Full workflow: createStream → withdraw → cancelStream
-   - [ ] Multi-token streams
-   - [ ] Escrow locking + release flow
-
----
-
-## Gas Optimization Notes
-
-**Current Costs (Estimated):**
-- Stream creation: ~74k gas
-- Withdrawal: ~52k gas (includes escrow lock)
-- Stream cancellation: ~24k gas
-
-**Future Optimizations:**
-- StreamMath could be expanded with custom calculations
-- Consider packing Stream struct (use uint96 for amounts if possible)
-- Batch operations for admin functions
-
----
-
-## Security Checklist
-
-- [x] ReentrancyGuard on sensitive functions
-- [x] SafeERC20 for token transfers
-- [x] Checks-Effects-Interactions pattern
-- [x] Access control on admin functions
-- [ ] Token whitelist (HIGH PRIORITY)
-- [ ] System-wide Pausable (MEDIUM)
-- [ ] Input validation bounds (MEDIUM)
-- [ ] sweepToken() safety guard (MEDIUM)
-- [ ] setMilestoneEscrow() one-time lock (MEDIUM)
-- [ ] Formal audit (before mainnet)
-
----
-
-## Next Steps
-
-### Phase 1: Complete Core Features
-1. Implement milestone submission/approval/rejection/claim in MilestoneEscrow
-2. Add pauseStream() / resumeStream() to PaystreamCore
-3. Add token whitelist security
-
-### Phase 2: Hardening
-1. Add system-wide Pausable
-2. Add input validation bounds
-3. Fix sweepToken() and setMilestoneEscrow()
-4. Handle integer division dust
-
-### Phase 3: Testing & Deployment
-1. Write comprehensive unit tests
-2. Integration test full workflows
-3. Deploy to Sepolia testnet
-4. Verify on Etherscan
-5. Prepare for audit
-
-### Phase 4: Frontend Integration
-1. Generate TypeChain types
-2. Create React hooks for common operations
-3. Build simple UI for stream management
-
----
-
-## Key Contacts & Resources
-
-**Contracts:**
-- PaystreamCore: `contracts/PaystreamCore.sol`
-- MilestoneEscrow: `contracts/MilestoneEscrow.sol`
-- StreamMath: `contracts/StreamMath.sol`
-
-**Dependencies:**
-- OpenZeppelin Contracts v5.4.0
-- Hardhat v2.22.2
-- Ethers.js v6.13.1
-
-**Documentation:**
-- [OpenZeppelin Docs](https://docs.openzeppelin.com/contracts/)
-- [Hardhat Docs](https://hardhat.org/docs)
-- [Solidity Docs](https://docs.soliditylang.org/)
-
----
-
-## Architecture Strengths ✅
-
-1. **Clean composition pattern** - Independent contracts, easy to test
-2. **Multi-token support** - Single deployment, multiple tokens
-3. **Flexible escrow %** - Configurable per-stream
-4. **Minimal dependencies** - Only OpenZeppelin, no complex libs
-5. **Good safety** - ReentrancyGuard, SafeERC20
-6. **Event-driven** - All state changes emit events (good for indexing)
-
-## Architecture Weaknesses ⚠️
-
-1. **Incomplete milestone workflow** - Escrow exists but no approval logic
-2. **Missing pause/resume** - Flags exist but no control functions
-3. **No token whitelist** - Accepts any ERC20 (security risk)
-4. **sweepToken() dangerous** - Can drain active stream tokens
-5. **No system pause** - Emergency stop missing
-
-**Overall Score: 8.5/10** - Solid foundation, needs completion & hardening
+**Overall Score: 9/10** - A robust and complete system with a solid, simplified foundation. Ready for comprehensive testing and further hardening.
 
 ---
 
