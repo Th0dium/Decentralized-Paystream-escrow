@@ -1,15 +1,15 @@
 # Paystream Backend
 
-Express.js + Prisma + PostgreSQL (Supabase) backend for Paystream.
+Express.js + Prisma + PostgreSQL (Neon) backend for Paystream.
 
 ## Quick Start
 
-### 1. Setup Supabase
+### 1. Setup Neon Database
 
-1. Go to [supabase.com](https://supabase.com)
+1. Go to [neon.tech](https://neon.tech)
 2. Create a new project
 3. Copy your database connection string (PostgreSQL)
-4. Save it to `.env` as `DATABASE_URL`
+4. Save it to `.env.local` as `DATABASE_URL`
 
 ### 2. Setup Environment
 
@@ -18,7 +18,7 @@ cp .env.example .env.local
 ```
 
 Update `.env.local`:
-- `DATABASE_URL` - From Supabase
+- `DATABASE_URL` - From Neon
 - `JWT_SECRET` - Generate a strong key
 - `RPC_URL` - Sepolia RPC endpoint (Infura)
 - `CONTRACT_ADDRESS` - Your deployed contract
