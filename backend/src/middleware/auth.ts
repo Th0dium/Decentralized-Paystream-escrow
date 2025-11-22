@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express'
-import jwt from 'jsonwebtoken'
+import jwt, { SignOptions } from 'jsonwebtoken'
 import { config } from '../config/env'
 
 export interface AuthRequest extends Request {
@@ -30,7 +30,8 @@ export const authenticateToken = (
 }
 
 export const generateToken = (walletAddress: string): string => {
-  return jwt.sign({ walletAddress }, config.jwt.secret, {
-    expiresIn: config.jwt.expiresIn,
-  })
+  const options: SignOptions = {
+    expiresIn: config.jwt.expiresIn as any,
+  }
+  return jwt.sign({ walletAddress }, config.jwt.secret, options)
 }
