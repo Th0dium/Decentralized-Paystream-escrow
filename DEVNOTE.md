@@ -1,6 +1,6 @@
 # Paystream Architecture Decisions
 
-This document outlines the core architectural decisions made during the development of the `Paystream.sol` smart contract.
+This document outlines the core architectural decisions made during the development of the Paystream platform (smart contract + frontend).
 
 ---
 
@@ -56,3 +56,37 @@ This document outlines the core architectural decisions made during the developm
 *   The `Stream` struct contains `totalPausedDuration` (a running total of completed pauses) and `pausedAt` (the timestamp of the current pause, if active).
 *   `resumeStream` calculates the duration of the just-ended pause and adds it to `totalPausedDuration`.
 *   The `claimable` function calculates `workingTime` by subtracting the total paused time (both completed and current) from the total time elapsed since the stream started. This `workingTime` is then used to determine the vested amount.
+
+---
+
+### 5. Frontend: Backend-Driven Role Assignment
+
+**Decision:** The frontend communicates with a backend API to determine user roles. No role is assumed from wallet address alone.
+
+**Rationale:**
+*   **Flexibility & Security:** Admin can assign or revoke roles without frontend changes.
+*   **Auditability:** Role assignments are logged on the backend.
+*   **Future-Ready:** Easy to add role tiers or custom permissions.
+
+**Flow:**
+1. User connects MetaMask wallet
+2. Frontend sends wallet address → `POST /auth/verify-wallet`
+3. Backend returns: `{ walletAddress, role: COMPANY|EMPLOYEE|AUDITOR|null }`
+4. Frontend displays role-based dashboard
+
+---
+
+### 6. Frontend Stack: Next.js + Zustand
+
+**Decision:** Modern Next.js 14 with TypeScript, Tailwind CSS, and Zustand for lightweight state management.
+
+**Rationale:**
+*   **Developer Experience:** Next.js provides routing, SSR, and optimizations out-of-box.
+*   **Simplicity:** Zustand eliminates Redux boilerplate while handling global auth state.
+*   **Type Safety:** TypeScript prevents bugs across frontend and API integration.
+
+**Structure:**
+*   `app/` - Next.js pages (routing, auth flows)
+*   `components/` - Reusable UI (Header, Sidebar, Button, Card)
+*   `lib/` - API client, hooks, utilities, auth store
+*   Role-based routes: `/dashboard/employee/*`, `/dashboard/company/*`, `/dashboard/auditor/*`
