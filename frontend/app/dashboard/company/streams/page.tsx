@@ -147,7 +147,7 @@ export default function CompanyStreamsPage() {
                       onClick={() =>
                         handleStreamAction(stream.streamId, "pause")
                       }
-                      variant="warning"
+                      variant="secondary"
                       loading={
                         actionStreamId === stream.streamId &&
                         actionType === "pause" &&

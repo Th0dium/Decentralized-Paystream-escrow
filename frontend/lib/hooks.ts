@@ -27,7 +27,7 @@ export const useVerifyWallet = (walletAddress: string | null) => {
     setIsVerifying(true);
     setLoading(true);
     try {
-      const response: AuthResponse = await authApi.verifyWallet(walletAddress);
+      const response = await authApi.verifyWallet(walletAddress);
       if (response.success) {
         setAuth(response.data.walletAddress, response.data.role);
       } else {

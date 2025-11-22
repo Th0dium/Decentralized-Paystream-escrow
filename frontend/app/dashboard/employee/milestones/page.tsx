@@ -9,9 +9,6 @@ import { MilestoneStatus } from "@/lib/types";
 export default function MilestonesPage() {
   const { walletAddress } = useAuth();
   const { milestones, loading } = useEmployeeMilestones(walletAddress);
-  const [selectedMilestoneId, setSelectedMilestoneId] = useState<number | null>(
-    null
-  );
   const [isClaimingIndex, setIsClaimingIndex] = useState<number | null>(null);
 
   const handleClaimMilestone = async (milestoneId: number) => {

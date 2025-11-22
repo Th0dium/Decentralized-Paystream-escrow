@@ -8,7 +8,7 @@ import { MilestoneStatus } from "@/lib/types";
 
 export default function AuditorMilestonesPage() {
   const { milestones, loading, refetch } = usePendingMilestones();
-  const [selectedMilestoneId, setSelectedMilestoneId] = useState<number | null>(
+  const [selectedMilestoneId] = useState<number | null>(
     null
   );
   const [reviewingId, setReviewingId] = useState<number | null>(null);

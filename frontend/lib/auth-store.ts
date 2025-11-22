@@ -50,13 +50,17 @@ export const useAuthStore = create<AuthStore>((set) => ({
   initFromStorage: () => {
     if (typeof window !== "undefined") {
       const walletAddress = localStorage.getItem("walletAddress");
-      const role = localStorage.getItem("userRole") as UserRole | null;
+      const storedRole = localStorage.getItem("userRole"); // Read as string | null
 
-      if (walletAddress && role !== null) {
+      if (walletAddress && storedRole !== null) {
+        // Check if the stored value is a valid role, otherwise treat as null
+        const role: UserRole = ["COMPANY", "EMPLOYEE", "AUDITOR"].includes(storedRole)
+          ? (storedRole as UserRole)
+          : null;
         set({
           isAuthenticated: true,
           walletAddress,
-          role: role === "" ? null : (role as UserRole),
+          role: role,
         });
       }
     }

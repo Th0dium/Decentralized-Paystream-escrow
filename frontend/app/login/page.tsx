@@ -28,14 +28,14 @@ export default function LoginPage() {
 
     try {
       // Check if window.ethereum is available (MetaMask)
-      if (!window.ethereum) {
+      if (!(window as any).ethereum) {
         throw new Error("MetaMask is not installed. Please install MetaMask.");
       }
 
       // Request account access
-      const accounts = await window.ethereum.request({
+      const accounts = await (window as any).ethereum.request({
         method: "eth_requestAccounts",
-      } as any);
+      });
 
       if (accounts && accounts.length > 0) {
         const address = accounts[0];
