@@ -1,0 +1,82 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int     @id @default(autoincrement())
+  wallet    String  @unique
+  role      String? // "COMPANY", "EMPLOYEE", "AUDITOR", or null
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([wallet])
+}
+
+model Stream {
+  id                    Int     @id @default(autoincrement())
+  streamId              Int     @unique
+  company               String
+  employee              String
+  token                 String
+  totalAmount           String  // Store as string (big numbers)
+  startTime             BigInt
+  stopTime              BigInt
+  lastWithdrawTime      BigInt?
+  withdrawn             String  @default("0")
+  escrowBps             Int
+  escrowed              String  @default("0")
+  paused                Boolean @default(false)
+  cancelled             Boolean @default(false)
+  totalPausedDuration   BigInt  @default(0)
+  pausedAt              BigInt? @default(0)
+  status                String  @default("ACTIVE") // ACTIVE, PAUSED, CANCELLED
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  milestones Milestone[]
+
+  @@index([company])
+  @@index([employee])
+  @@index([status])
+}
+
+model Milestone {
+  id          Int     @id @default(autoincrement())
+  milestoneId Int     @unique
+  streamId    Int
+  submitter   String
+  amount      String
+  status      String  @default("PENDING") // PENDING, APPROVED, REJECTED, CLAIMED
+  ipfsHash    String?
+  createdAt   DateTime @default(now())
+  approvedAt  DateTime?
+  approver    String?
+  updatedAt   DateTime @updatedAt
+
+  stream Stream @relation(fields: [streamId], references: [streamId])
+
+  @@index([streamId])
+  @@index([submitter])
+  @@index([status])
+}
+
+model ContractEvent {
+  id            Int     @id @default(autoincrement())
+  eventName     String  // StreamCreated, Withdrawn, MilestoneSubmitted, etc.
+  blockNumber   Int
+  transactionHash String @unique
+  data          Json    // Store full event data as JSON
+  processed     Boolean @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([eventName])
+  @@index([processed])
+}
