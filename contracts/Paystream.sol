@@ -274,17 +274,17 @@ contract Paystream is ReentrancyGuard, AccessControl {
         Stream storage s = streams[streamId];
         require(s.company != address(0), "stream does not exist");
 
-        uint64 now = uint64(block.timestamp);
-        if (now < s.startTime) return 0;
+        uint64 nowTs = uint64(block.timestamp);
+        if (nowTs < s.startTime) return 0;
 
         uint64 totalDuration = s.stopTime - s.startTime;
         if (totalDuration == 0) return s.totalAmount - s.withdrawn;
 
-        uint64 rawElapsed = now > s.stopTime
+        uint64 rawElapsed = nowTs > s.stopTime
             ? totalDuration
-            : now - s.startTime;
+            : nowTs - s.startTime;
 
-        uint64 currentPauseDuration = s.paused ? now - s.pausedAt : 0;
+        uint64 currentPauseDuration = s.paused ? nowTs - s.pausedAt : 0;
         uint64 totalPausedTime = s.totalPausedDuration + currentPauseDuration;
 
         uint64 workingTime = rawElapsed > totalPausedTime
