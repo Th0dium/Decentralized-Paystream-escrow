@@ -11,9 +11,9 @@ export const useAuth = () => {
   useEffect(() => {
     auth.initFromStorage();
     setIsHydrated(true);
-  }, [auth]);
+  }, [auth.isAuthenticated]);
 
-  return { ...auth, isHydrated };
+  return { ...auth, isHydrated: isHydrated || auth.isAuthenticated };
 };
 
 // Hook for verifying wallet and getting role
