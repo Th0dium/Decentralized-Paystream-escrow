@@ -2,13 +2,20 @@ import { Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import { AuthRequest } from '../middleware/auth'
 
-const prisma = new PrismaClient()
+let prisma: PrismaClient
+
+function getPrisma() {
+  if (!prisma) {
+    prisma = new PrismaClient()
+  }
+  return prisma
+}
 
 export const getEmployeeStreams = async (req: AuthRequest, res: Response) => {
   try {
     const { walletAddress } = req.params
 
-    const streams = await prisma.stream.findMany({
+    const streams = await getPrisma().stream.findMany({
       where: {
         employee: walletAddress.toLowerCase(),
       },
@@ -31,7 +38,7 @@ export const getCompanyStreams = async (req: AuthRequest, res: Response) => {
   try {
     const { walletAddress } = req.params
 
-    const streams = await prisma.stream.findMany({
+    const streams = await getPrisma().stream.findMany({
       where: {
         company: walletAddress.toLowerCase(),
       },
@@ -54,7 +61,7 @@ export const getStreamDetails = async (req: AuthRequest, res: Response) => {
   try {
     const { streamId } = req.params
 
-    const stream = await prisma.stream.findUnique({
+    const stream = await getPrisma().stream.findUnique({
       where: { streamId: parseInt(streamId) },
       include: {
         milestones: true,
@@ -99,7 +106,7 @@ export const createStream = async (req: AuthRequest, res: Response) => {
       })
     }
 
-    const stream = await prisma.stream.create({
+    const stream = await getPrisma().stream.create({
       data: {
         streamId,
         company: company.toLowerCase(),
@@ -132,7 +139,7 @@ export const updateStreamStatus = async (req: AuthRequest, res: Response) => {
     if (status) updateData.status = status
     if (paused !== undefined) updateData.paused = paused
 
-    const stream = await prisma.stream.update({
+    const stream = await getPrisma().stream.update({
       where: { streamId: parseInt(streamId) },
       data: updateData,
     })

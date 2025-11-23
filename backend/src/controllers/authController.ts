@@ -3,7 +3,16 @@ import { PrismaClient } from '@prisma/client'
 import { generateToken } from '../middleware/auth'
 import { AuthRequest } from '../middleware/auth'
 
-const prisma = new PrismaClient()
+// Import prisma instance from a central location
+let prisma: PrismaClient
+
+// Lazy initialize prisma to ensure DATABASE_URL is available
+function getPrisma() {
+  if (!prisma) {
+    prisma = new PrismaClient()
+  }
+  return prisma
+}
 
 export const verifyWallet = async (req: AuthRequest, res: Response) => {
   console.log('\n🔑 === VERIFY WALLET REQUEST ===')
@@ -37,7 +46,7 @@ export const verifyWallet = async (req: AuthRequest, res: Response) => {
 
     // Find or create user
     console.log('🔍 Querying database for existing user...')
-    let user = await prisma.user.findUnique({
+    let user = await getPrisma().user.findUnique({
       where: { wallet: normalizedAddress },
     })
 
@@ -46,7 +55,7 @@ export const verifyWallet = async (req: AuthRequest, res: Response) => {
 
     if (!user) {
       console.log('➕ Creating new user...')
-      user = await prisma.user.create({
+      user = await getPrisma().user.create({
         data: {
           wallet: normalizedAddress,
           role: null,
@@ -92,7 +101,7 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
       return res.status(401).json({ success: false, error: 'Not authenticated' })
     }
 
-    const user = await prisma.user.findUnique({
+    const user = await getPrisma().user.findUnique({
       where: { wallet: req.user.walletAddress },
     })
 

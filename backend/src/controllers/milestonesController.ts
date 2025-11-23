@@ -2,13 +2,20 @@ import { Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import { AuthRequest } from '../middleware/auth'
 
-const prisma = new PrismaClient()
+let prisma: PrismaClient
+
+function getPrisma() {
+  if (!prisma) {
+    prisma = new PrismaClient()
+  }
+  return prisma
+}
 
 export const getEmployeeMilestones = async (req: AuthRequest, res: Response) => {
   try {
     const { walletAddress } = req.params
 
-    const milestones = await prisma.milestone.findMany({
+    const milestones = await getPrisma().milestone.findMany({
       where: {
         submitter: walletAddress.toLowerCase(),
       },
@@ -32,7 +39,7 @@ export const getEmployeeMilestones = async (req: AuthRequest, res: Response) => 
 
 export const getPendingMilestones = async (req: AuthRequest, res: Response) => {
   try {
-    const milestones = await prisma.milestone.findMany({
+    const milestones = await getPrisma().milestone.findMany({
       where: {
         status: 'PENDING',
       },
@@ -61,7 +68,7 @@ export const getMilestoneDetails = async (req: AuthRequest, res: Response) => {
   try {
     const { milestoneId } = req.params
 
-    const milestone = await prisma.milestone.findUnique({
+    const milestone = await getPrisma().milestone.findUnique({
       where: { milestoneId: parseInt(milestoneId) },
       include: {
         stream: true,
@@ -96,7 +103,7 @@ export const createMilestone = async (req: AuthRequest, res: Response) => {
       })
     }
 
-    const milestone = await prisma.milestone.create({
+    const milestone = await getPrisma().milestone.create({
       data: {
         milestoneId,
         streamId,
@@ -128,7 +135,7 @@ export const approveMilestone = async (req: AuthRequest, res: Response) => {
       return res.status(401).json({ success: false, error: 'Not authenticated' })
     }
 
-    const milestone = await prisma.milestone.update({
+    const milestone = await getPrisma().milestone.update({
       where: { milestoneId: parseInt(milestoneId) },
       data: {
         status: 'APPROVED',
@@ -158,7 +165,7 @@ export const rejectMilestone = async (req: AuthRequest, res: Response) => {
       return res.status(401).json({ success: false, error: 'Not authenticated' })
     }
 
-    const milestone = await prisma.milestone.update({
+    const milestone = await getPrisma().milestone.update({
       where: { milestoneId: parseInt(milestoneId) },
       data: {
         status: 'REJECTED',
