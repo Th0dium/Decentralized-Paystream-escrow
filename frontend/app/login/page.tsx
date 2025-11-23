@@ -7,6 +7,16 @@ import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { useAuth, useVerifyWallet } from "@/lib/hooks";
 
+interface EthereumProvider {
+  request: (args: { method: string }) => Promise<string[]>;
+}
+
+declare global {
+  interface Window {
+    ethereum?: EthereumProvider;
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { isAuthenticated, isHydrated } = useAuth();
@@ -28,12 +38,12 @@ export default function LoginPage() {
 
     try {
       // Check if window.ethereum is available (MetaMask)
-      if (!(window as any).ethereum) {
+      if (!window.ethereum) {
         throw new Error("MetaMask is not installed. Please install MetaMask.");
       }
 
       // Request account access
-      const accounts = await (window as any).ethereum.request({
+      const accounts = await window.ethereum.request({
         method: "eth_requestAccounts",
       });
 
@@ -113,7 +123,7 @@ export default function LoginPage() {
             </Button>
 
             <p className="text-center text-sm text-gray-600">
-              Don't have a wallet?{" "}
+              Don&apos;t have a wallet?{" "}
               <a
                 href="https://metamask.io"
                 target="_blank"
