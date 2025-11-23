@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuthStore } from "./auth-store";
 import { authApi, streamsApi, milestonesApi } from "./api-client";
 import { AuthResponse, Stream, Milestone } from "./types";
@@ -21,25 +21,35 @@ export const useVerifyWallet = (walletAddress: string | null) => {
   const { setAuth, setLoading, setError } = useAuthStore();
   const [isVerifying, setIsVerifying] = useState(false);
 
-  const verify = async () => {
-    if (!walletAddress) return;
+  const verify = useCallback(async () => {
+    if (!walletAddress) {
+      console.log("⚠️ No wallet address to verify");
+      return;
+    }
 
+    console.log("🔐 Verifying wallet:", walletAddress);
     setIsVerifying(true);
     setLoading(true);
     try {
+      console.log("📤 Sending verify request to backend...");
       const response: AuthResponse = await authApi.verifyWallet(walletAddress);
+      console.log("📥 Backend response:", response);
       if (response.success) {
+        console.log("✅ Wallet verified! Role:", response.data.role);
         setAuth(response.data.walletAddress, response.data.role);
       } else {
+        console.error("❌ Verification failed:", response);
         setError("Failed to verify wallet");
       }
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Verification failed");
+      const errorMsg = error instanceof Error ? error.message : "Verification failed";
+      console.error("❌ Verification error:", errorMsg);
+      setError(errorMsg);
     } finally {
       setIsVerifying(false);
       setLoading(false);
     }
-  };
+  }, [walletAddress, setAuth, setLoading, setError]);
 
   return { verify, isVerifying };
 };
