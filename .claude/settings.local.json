@@ -5,7 +5,9 @@
       "Bash(dir /B \"c:\\Dev\\Decentralized-Paystream-escrow\")",
       "Bash(dir:*)",
       "Bash(nul)",
-      "Bash(dir /B \"c:\\Dev\\Decentralized-Paystream-escrow\\src\" 2)"
+      "Bash(dir /B \"c:\\Dev\\Decentralized-Paystream-escrow\\src\" 2)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []

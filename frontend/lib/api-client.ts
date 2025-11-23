@@ -12,7 +12,7 @@ const apiClient = axios.create({
 export const authApi = {
   verifyWallet: async (address: string): Promise<AuthResponse> => {
     // In a real app, you'd send a signature to be verified
-    const response = await apiClient.post("/auth/verify", { address });
+    const response = await apiClient.post("/auth/verify-wallet", { address });
     return response.data;
   },
 };
