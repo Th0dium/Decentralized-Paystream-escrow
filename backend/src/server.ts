@@ -11,8 +11,30 @@ import { PrismaClient } from '@prisma/client'
 const app = express()
 const prisma = new PrismaClient()
 
+// CORS configuration with pattern matching for Vercel preview URLs
+const corsOptions = {
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true)
+
+    // Check if origin matches configured origins or Vercel pattern
+    const allowedOrigins = config.cors.origin
+    const vercelPattern = /https:\/\/.*\.vercel\.app$/
+    const isAllowed = allowedOrigins.includes(origin) || vercelPattern.test(origin)
+
+    if (isAllowed) {
+      callback(null, true)
+    } else {
+      console.warn(`⚠️  CORS blocked origin: ${origin}`)
+      callback(new Error('CORS policy violation'))
+    }
+  },
+  credentials: true,
+  optionsSuccessStatus: 200,
+}
+
 // Middleware
-app.use(cors({ origin: config.cors.origin }))
+app.use(cors(corsOptions))
 app.use(express.json())
 
 // Routes
