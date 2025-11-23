@@ -2,7 +2,14 @@ import { ethers } from 'ethers'
 import { PrismaClient } from '@prisma/client'
 import { config } from '../config/env'
 
-const prisma = new PrismaClient()
+let prisma: PrismaClient
+
+function getPrisma() {
+  if (!prisma) {
+    prisma = new PrismaClient()
+  }
+  return prisma
+}
 
 // ABI events - you'll need to extract from your compiled contract
 const PAYSTREAM_ABI = [
@@ -41,7 +48,7 @@ export async function startContractListener() {
 
         console.log(`📍 StreamCreated event: streamId=${streamId}`)
 
-        await prisma.stream.create({
+        await getPrisma().stream.create({
           data: {
             streamId: parseInt(streamId),
             company: company.toLowerCase(),
@@ -75,7 +82,7 @@ export async function startContractListener() {
 
         console.log(`📍 Withdrawn event: streamId=${streamId}`)
 
-        await prisma.stream.update({
+        await getPrisma().stream.update({
           where: { streamId: parseInt(streamId) },
           data: {
             withdrawn: payout.toString(),
@@ -103,7 +110,7 @@ export async function startContractListener() {
 
         console.log(`📍 MilestoneSubmitted event: milestoneId=${milestoneId}`)
 
-        await prisma.milestone.create({
+        await getPrisma().milestone.create({
           data: {
             milestoneId: parseInt(milestoneId),
             streamId: parseInt(streamId),
@@ -134,7 +141,7 @@ export async function startContractListener() {
 
         console.log(`📍 StreamPaused event: streamId=${streamId}`)
 
-        await prisma.stream.update({
+        await getPrisma().stream.update({
           where: { streamId: parseInt(streamId) },
           data: { paused: true, status: 'PAUSED' },
         })
@@ -154,7 +161,7 @@ export async function startContractListener() {
 
         console.log(`📍 StreamCancelled event: streamId=${streamId}`)
 
-        await prisma.stream.update({
+        await getPrisma().stream.update({
           where: { streamId: parseInt(streamId) },
           data: { cancelled: true, status: 'CANCELLED' },
         })
@@ -180,7 +187,7 @@ async function logContractEvent(
   data: any
 ) {
   try {
-    await prisma.contractEvent.create({
+    await getPrisma().contractEvent.create({
       data: {
         eventName,
         blockNumber,
