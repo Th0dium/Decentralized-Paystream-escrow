@@ -36,12 +36,12 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, isHydrated, router]);
 
-  const connectWallet = async (retryCount = 0) => {
+  const connectWallet = async () => {
     setIsConnecting(true);
     setError(null);
 
     try {
-      console.log(`🔗 Starting wallet connection... (attempt ${retryCount + 1})`);
+      console.log("🔗 Starting wallet connection...");
       console.log("Phantom available:", !!window.phantom?.ethereum);
       console.log("MetaMask available:", !!window.ethereum);
 
@@ -73,21 +73,7 @@ export default function LoginPage() {
       const errorMessage = err instanceof Error
         ? err.message
         : "Failed to connect wallet. Please try again.";
-
       console.error("❌ Error:", errorMessage);
-
-      // Retry logic for Phantom disconnection issues
-      if (
-        retryCount < 2 &&
-        errorMessage.includes("disconnected") ||
-        errorMessage.includes("Unexpected error")
-      ) {
-        console.log(`⏳ Retrying in 1 second... (attempt ${retryCount + 1})`);
-        setIsConnecting(false);
-        setTimeout(() => connectWallet(retryCount + 1), 1000);
-        return;
-      }
-
       setError(errorMessage);
     } finally {
       setIsConnecting(false);
