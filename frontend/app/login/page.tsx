@@ -9,10 +9,14 @@ import { useAuth, useVerifyWallet } from "@/lib/hooks";
 
 interface EthereumProvider {
   request: (args: { method: string }) => Promise<string[]>;
+  isPhantom?: boolean;
 }
 
 declare global {
   interface Window {
+    phantom?: {
+      ethereum?: EthereumProvider;
+    };
     ethereum?: EthereumProvider;
   }
 }
@@ -37,13 +41,15 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      // Check if window.ethereum is available (MetaMask)
-      if (!window.ethereum) {
-        throw new Error("MetaMask is not installed. Please install MetaMask.");
+      // Check if Phantom is available first, then fall back to MetaMask
+      const provider = window.phantom?.ethereum || window.ethereum;
+
+      if (!provider) {
+        throw new Error("No wallet extension found. Please install Phantom or MetaMask.");
       }
 
       // Request account access
-      const accounts = await window.ethereum.request({
+      const accounts = await provider.request({
         method: "eth_requestAccounts",
       });
 
@@ -119,18 +125,18 @@ export default function LoginPage() {
                 ? "Connecting..."
                 : isVerifying
                   ? "Verifying..."
-                  : "Connect MetaMask"}
+                  : "Connect Phantom Wallet"}
             </Button>
 
             <p className="text-center text-sm text-gray-600">
               Don&apos;t have a wallet?{" "}
               <a
-                href="https://metamask.io"
+                href="https://phantom.app"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-600 hover:underline"
               >
-                Install MetaMask
+                Install Phantom
               </a>
             </p>
           </Card>
