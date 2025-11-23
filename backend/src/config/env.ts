@@ -20,7 +20,7 @@ export const config = {
     nodeEnv: process.env.NODE_ENV || 'development',
   },
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(o => o.trim()) : ['http://localhost:3000'],
   },
   pinata: {
     apiKey: process.env.PINATA_API_KEY || '',
