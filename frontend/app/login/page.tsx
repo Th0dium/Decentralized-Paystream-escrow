@@ -36,11 +36,15 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, isHydrated, router]);
 
-  const connectWallet = async () => {
+  const connectWallet = async (retryCount = 0) => {
     setIsConnecting(true);
     setError(null);
 
     try {
+      console.log(`🔗 Starting wallet connection... (attempt ${retryCount + 1})`);
+      console.log("Phantom available:", !!window.phantom?.ethereum);
+      console.log("MetaMask available:", !!window.ethereum);
+
       // Check if Phantom is available first, then fall back to MetaMask
       const provider = window.phantom?.ethereum || window.ethereum;
 
@@ -48,24 +52,43 @@ export default function LoginPage() {
         throw new Error("No wallet extension found. Please install Phantom or MetaMask.");
       }
 
+      console.log("✅ Wallet provider found");
+
       // Request account access
       const accounts = await provider.request({
         method: "eth_requestAccounts",
       });
 
+      console.log("📝 Accounts received:", accounts);
+
       if (accounts && accounts.length > 0) {
         const address = accounts[0];
+        console.log("🎯 Setting wallet address:", address);
         setWalletAddress(address);
         // Verify wallet will be called in useEffect
       } else {
         throw new Error("No wallet accounts found");
       }
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to connect wallet. Please try again."
-      );
+      const errorMessage = err instanceof Error
+        ? err.message
+        : "Failed to connect wallet. Please try again.";
+
+      console.error("❌ Error:", errorMessage);
+
+      // Retry logic for Phantom disconnection issues
+      if (
+        retryCount < 2 &&
+        errorMessage.includes("disconnected") ||
+        errorMessage.includes("Unexpected error")
+      ) {
+        console.log(`⏳ Retrying in 1 second... (attempt ${retryCount + 1})`);
+        setIsConnecting(false);
+        setTimeout(() => connectWallet(retryCount + 1), 1000);
+        return;
+      }
+
+      setError(errorMessage);
     } finally {
       setIsConnecting(false);
     }
@@ -76,7 +99,7 @@ export default function LoginPage() {
     if (walletAddress && !isVerifying) {
       verify();
     }
-  }, [walletAddress]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [walletAddress, verify, isVerifying]);
 
   if (!isHydrated) {
     return (
