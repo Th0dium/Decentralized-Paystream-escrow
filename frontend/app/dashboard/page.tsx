@@ -41,6 +41,14 @@ export default function DashboardPage() {
               <ul className="space-y-2">
                 <li>
                   <Link
+                    href="/dashboard/employee/deposit"
+                    className="text-blue-600 hover:underline"
+                  >
+                    Deposit Tokens →
+                  </Link>
+                </li>
+                <li>
+                  <Link
                     href="/dashboard/employee/streams"
                     className="text-blue-600 hover:underline"
                   >

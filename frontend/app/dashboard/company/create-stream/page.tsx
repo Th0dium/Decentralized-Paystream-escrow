@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
+import { TokenSelector } from "@/components/TokenSelector";
+import { approveTokens, createStream, checkNetwork } from "@/lib/contract-interaction";
+import { Token } from "@/lib/tokens";
 
 export default function CreateStreamPage() {
   const [formData, setFormData] = useState({
@@ -11,9 +14,11 @@ export default function CreateStreamPage() {
     duration: 30, // days
     escrowPercentage: 30,
   });
+  const [selectedToken, setSelectedToken] = useState<Token | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [transactionHash, setTransactionHash] = useState<string | null>(null);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -21,7 +26,10 @@ export default function CreateStreamPage() {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: name === "totalAmount" ? value : name === "duration" ? parseInt(value) : parseInt(value),
+      [name]:
+        name === "employeeAddress" || name === "totalAmount"
+          ? value
+          : parseInt(value),
     }));
   };
 
@@ -29,10 +37,16 @@ export default function CreateStreamPage() {
     e.preventDefault();
     setError(null);
     setSuccess(null);
+    setTransactionHash(null);
 
     // Validation
     if (!formData.employeeAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
-      setError("Invalid Ethereum address");
+      setError("Invalid Employee Ethereum address");
+      return;
+    }
+
+    if (!selectedToken) {
+      setError("Please select a token");
       return;
     }
 
@@ -54,17 +68,60 @@ export default function CreateStreamPage() {
     setIsSubmitting(true);
 
     try {
-      // TODO: Call smart contract createStream function
-      console.log("Creating stream:", formData);
-      setSuccess("Stream created successfully!");
+      const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
+      const chainId = parseInt(process.env.NEXT_PUBLIC_CHAIN_ID || "11155111");
+
+      if (!contractAddress) {
+        throw new Error("Contract address not configured");
+      }
+
+      console.log("\n🚀 Starting stream creation process...");
+
+      // Check network
+      console.log("🔍 Checking network...");
+      const correctNetwork = await checkNetwork(chainId);
+      if (!correctNetwork) {
+        throw new Error(`Please switch to the correct network (chain ID: ${chainId})`);
+      }
+
+      // Step 1: Approve tokens
+      console.log("\n📝 Step 1: Approving tokens...");
+      const approvalHash = await approveTokens(
+        selectedToken.address,
+        contractAddress,
+        formData.totalAmount
+      );
+      console.log(`✅ Approval hash: ${approvalHash}`);
+
+      // Step 2: Create stream
+      console.log("\n📝 Step 2: Creating stream...");
+      const result = await createStream(
+        contractAddress,
+        formData.employeeAddress,
+        selectedToken.address,
+        formData.totalAmount,
+        formData.duration,
+        formData.escrowPercentage
+      );
+
+      console.log(`\n✅ Stream created successfully!`);
+      console.log(`Transaction hash: ${result.transactionHash}`);
+
+      setSuccess("Stream created successfully! Check Etherscan for transaction details.");
+      setTransactionHash(result.transactionHash);
+
+      // Reset form
       setFormData({
         employeeAddress: "",
         totalAmount: "",
         duration: 30,
         escrowPercentage: 30,
       });
+      setSelectedToken(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create stream");
+      const errorMsg = err instanceof Error ? err.message : "Failed to create stream";
+      console.error("❌ Error creating stream:", errorMsg);
+      setError(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -90,6 +147,11 @@ export default function CreateStreamPage() {
           {success && (
             <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
               <p className="text-sm text-green-600">{success}</p>
+              {transactionHash && (
+                <p className="text-xs text-gray-600 mt-2 font-mono break-all">
+                  Tx: {transactionHash}
+                </p>
+              )}
             </div>
           )}
 
@@ -109,6 +171,13 @@ export default function CreateStreamPage() {
               Must be a valid Ethereum address
             </p>
           </div>
+
+          <TokenSelector
+            value={selectedToken?.address || ""}
+            onChange={setSelectedToken}
+            label="Token (ERC20)"
+            allowCustom={true}
+          />
 
           <div>
             <label className="block text-sm font-medium mb-2">
