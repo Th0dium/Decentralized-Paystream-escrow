@@ -58,7 +58,9 @@ export const verifyWallet = async (req: AuthRequest, res: Response) => {
       user = await getPrisma().user.create({
         data: {
           wallet: normalizedAddress,
-          role: null,
+          isCompany: false,
+          isEmployee: false,
+          isAuditor: false,
         },
       })
       console.log(`✅ User created with ID: ${user.id}`)
@@ -74,7 +76,9 @@ export const verifyWallet = async (req: AuthRequest, res: Response) => {
       success: true,
       data: {
         walletAddress: user.wallet,
-        role: user.role,
+        isCompany: user.isCompany,
+        isEmployee: user.isEmployee,
+        isAuditor: user.isAuditor,
         isNewUser,
         token,
       },
@@ -113,7 +117,9 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
       success: true,
       data: {
         walletAddress: user.wallet,
-        role: user.role,
+        isCompany: user.isCompany,
+        isEmployee: user.isEmployee,
+        isAuditor: user.isAuditor,
         createdAt: user.createdAt,
       },
     })

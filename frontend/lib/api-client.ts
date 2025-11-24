@@ -17,30 +17,30 @@ export const authApi = {
   },
 };
 
-export const streamsApi = {
+export const paymentsApi = {
   getEmployeeStreams: async (
     address: string
   ): Promise<ApiResponse<Stream[]>> => {
-    const response = await apiClient.get(`/streams/employee/${address}`);
+    const response = await apiClient.get(`/payments/employee/${address}`);
     return response.data;
   },
   getCompanyStreams: async (
     address: string
   ): Promise<ApiResponse<Stream[]>> => {
-    const response = await apiClient.get(`/streams/company/${address}`);
+    const response = await apiClient.get(`/payments/company/${address}`);
     return response.data;
   },
 };
 
-export const milestonesApi = {
+export const escrowsApi = {
   getEmployeeMilestones: async (
     address: string
   ): Promise<ApiResponse<Milestone[]>> => {
-    const response = await apiClient.get(`/milestones/employee/${address}`);
+    const response = await apiClient.get(`/escrows/employee/${address}`);
     return response.data;
   },
   getPendingMilestones: async (): Promise<ApiResponse<Milestone[]>> => {
-    const response = await apiClient.get("/milestones/pending");
+    const response = await apiClient.get("/escrows/pending");
     return response.data;
   },
 };

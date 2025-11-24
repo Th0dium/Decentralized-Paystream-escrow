@@ -1,8 +1,8 @@
 import { create } from "zustand";
-import { AuthState, UserRole } from "./types";
+import { AuthState } from "./types";
 
 interface AuthStore extends AuthState {
-  setAuth: (walletAddress: string, role: UserRole) => void;
+  setAuth: (walletAddress: string, isCompany: boolean, isEmployee: boolean, isAuditor: boolean) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   logout: () => void;
@@ -11,20 +11,26 @@ interface AuthStore extends AuthState {
 
 export const useAuthStore = create<AuthStore>((set) => ({
   isAuthenticated: false,
-  role: null,
+  isCompany: false,
+  isEmployee: false,
+  isAuditor: false,
   walletAddress: null,
   loading: false,
   error: null,
 
-  setAuth: (walletAddress, role) => {
+  setAuth: (walletAddress, isCompany, isEmployee, isAuditor) => {
     if (typeof window !== "undefined") {
       localStorage.setItem("walletAddress", walletAddress);
-      localStorage.setItem("userRole", role || "");
+      localStorage.setItem("isCompany", String(isCompany));
+      localStorage.setItem("isEmployee", String(isEmployee));
+      localStorage.setItem("isAuditor", String(isAuditor));
     }
     set({
       isAuthenticated: true,
       walletAddress,
-      role,
+      isCompany,
+      isEmployee,
+      isAuditor,
       error: null,
     });
   },
@@ -36,13 +42,17 @@ export const useAuthStore = create<AuthStore>((set) => ({
   logout: () => {
     if (typeof window !== "undefined") {
       localStorage.removeItem("walletAddress");
-      localStorage.removeItem("userRole");
+      localStorage.removeItem("isCompany");
+      localStorage.removeItem("isEmployee");
+      localStorage.removeItem("isAuditor");
       localStorage.removeItem("authToken");
     }
     set({
       isAuthenticated: false,
       walletAddress: null,
-      role: null,
+      isCompany: false,
+      isEmployee: false,
+      isAuditor: false,
       error: null,
     });
   },
@@ -50,17 +60,17 @@ export const useAuthStore = create<AuthStore>((set) => ({
   initFromStorage: () => {
     if (typeof window !== "undefined") {
       const walletAddress = localStorage.getItem("walletAddress");
-      const storedRole = localStorage.getItem("userRole"); // Read as string | null
+      const isCompany = localStorage.getItem("isCompany") === 'true';
+      const isEmployee = localStorage.getItem("isEmployee") === 'true';
+      const isAuditor = localStorage.getItem("isAuditor") === 'true';
 
-      if (walletAddress && storedRole !== null) {
-        // Check if the stored value is a valid role, otherwise treat as null
-        const role: UserRole = ["COMPANY", "EMPLOYEE", "AUDITOR"].includes(storedRole)
-          ? (storedRole as UserRole)
-          : null;
+      if (walletAddress) {
         set({
           isAuthenticated: true,
           walletAddress,
-          role: role,
+          isCompany,
+          isEmployee,
+          isAuditor,
         });
       }
     }

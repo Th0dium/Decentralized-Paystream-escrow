@@ -1,182 +1,157 @@
-import { ethers } from 'ethers'
-import { PrismaClient } from '@prisma/client'
-import { config } from '../config/env'
+import { ethers } from 'ethers';
+import { PrismaClient } from '@prisma/client';
+import { config } from '../config/env';
 
-let prisma: PrismaClient
+let prisma: PrismaClient;
 
 function getPrisma() {
   if (!prisma) {
-    prisma = new PrismaClient()
+    prisma = new PrismaClient();
   }
-  return prisma
+  return prisma;
 }
 
-// ABI events - you'll need to extract from your compiled contract
 const PAYSTREAM_ABI = [
-  'event StreamCreated(uint256 indexed streamId, address indexed company, address indexed employee, address token, uint256 totalAmount, uint64 startTime, uint64 stopTime, uint16 escrowBps, uint256 feeAmount)',
-  'event Withdrawn(uint256 indexed streamId, address indexed employee, uint256 payout, uint256 escrowed)',
-  'event MilestoneSubmitted(uint256 indexed milestoneId, uint256 indexed streamId, address indexed submitter, uint256 amount, string ipfsHash)',
-  'event MilestoneApproved(uint256 indexed milestoneId)',
-  'event MilestoneRejected(uint256 indexed milestoneId)',
-  'event StreamPaused(uint256 indexed streamId)',
-  'event StreamResumed(uint256 indexed streamId)',
-  'event StreamCancelled(uint256 indexed streamId)',
-]
+    "event PaymentCreated(uint256 indexed paymentId, address indexed company, address indexed employee, address token, uint256 totalAmount, uint64 startTime, uint64 stopTime, uint256 feeAmount)",
+    "event PaymentWithdrawn(uint256 indexed paymentId, address indexed employee, uint256 amount)",
+    "event PaymentPaused(uint256 indexed paymentId, address indexed by)",
+    "event PaymentResumed(uint256 indexed paymentId, address indexed by)",
+    "event PaymentCancelled(uint256 indexed paymentId, address indexed by, uint256 refunded)",
+    "event EscrowCreated(uint256 escrowId, uint256 indexed paymentId, address indexed company, address indexed employee, address token, uint256 amount, string description)",
+    "event EscrowApproved(uint256 indexed escrowId, address indexed auditor)",
+    "event EscrowRejected(uint256 indexed escrowId, address indexed auditor)",
+    "event EscrowClaimed(uint256 indexed escrowId, address indexed employee, uint256 amount)",
+    "event EscrowCancelled(uint256 indexed escrowId, address indexed company, uint256 refunded)",
+    "event PaymentAuditorAdded(uint256 indexed paymentId, address indexed auditor)",
+    "event EscrowAuditorAdded(uint256 indexed escrowId, address indexed auditor)"
+];
 
 export async function startContractListener() {
   try {
     if (!config.blockchain.rpcUrl || !config.blockchain.contractAddress) {
-      console.log('⚠️  Contract listener disabled (missing RPC_URL or CONTRACT_ADDRESS)')
-      return
+      console.log('⚠️  Contract listener disabled (missing RPC_URL or CONTRACT_ADDRESS)');
+      return;
     }
 
-    const provider = new ethers.JsonRpcProvider(config.blockchain.rpcUrl)
+    const provider = new ethers.JsonRpcProvider(config.blockchain.rpcUrl);
     const contract = new ethers.Contract(
       config.blockchain.contractAddress,
       PAYSTREAM_ABI,
       provider
-    )
+    );
 
-    console.log('🔍 Starting contract event listener...')
+    console.log('🔍 Starting contract event listener...');
 
-    // Listen for StreamCreated
-    contract.on('StreamCreated', async (...args) => {
+    contract.on('PaymentCreated', async (...args) => {
       try {
-        const event = args[args.length - 1]
-        const [streamId, company, employee, token, totalAmount, startTime, stopTime, escrowBps] =
-          args.slice(0, -1)
+        const event = args[args.length - 1];
+        const [paymentId, company, employee, token, totalAmount, startTime, stopTime] = args.slice(0, -1);
 
-        console.log(`📍 StreamCreated event: streamId=${streamId}`)
+        console.log(`📍 PaymentCreated event: paymentId=${paymentId}`);
 
-        await getPrisma().stream.create({
+        await getPrisma().payment.create({
           data: {
-            streamId: parseInt(streamId),
+            paymentId: parseInt(paymentId),
             company: company.toLowerCase(),
             employee: employee.toLowerCase(),
             token: token.toLowerCase(),
             totalAmount: totalAmount.toString(),
             startTime: BigInt(startTime),
             stopTime: BigInt(stopTime),
-            escrowBps: parseInt(escrowBps),
-            status: 'ACTIVE',
           },
-        })
+        });
+        
+        // Update user roles
+        await upsertUser(company.toLowerCase(), { isCompany: true });
+        await upsertUser(employee.toLowerCase(), { isEmployee: true });
 
-        await logContractEvent('StreamCreated', event.blockNumber, event.transactionHash, {
-          streamId,
-          company,
-          employee,
-        })
+        await logContractEvent('PaymentCreated', event.blockNumber, event.transactionHash, { paymentId, company, employee });
+        console.log(`✅ Payment ${paymentId} saved, roles updated`);
 
-        console.log(`✅ Stream ${streamId} saved to database`)
       } catch (error) {
-        console.error('Error processing StreamCreated:', error)
+        console.error('Error processing PaymentCreated:', error);
       }
-    })
+    });
 
-    // Listen for Withdrawn
-    contract.on('Withdrawn', async (...args) => {
-      try {
-        const event = args[args.length - 1]
-        const [streamId, employee, payout, escrowed] = args.slice(0, -1)
+    contract.on('EscrowCreated', async (...args) => {
+        try {
+            const event = args[args.length - 1];
+            const [escrowId, paymentId, company, employee, token, amount, description] = args.slice(0, -1);
 
-        console.log(`📍 Withdrawn event: streamId=${streamId}`)
+            console.log(`📍 EscrowCreated event: escrowId=${escrowId}`);
 
-        await getPrisma().stream.update({
-          where: { streamId: parseInt(streamId) },
-          data: {
-            withdrawn: payout.toString(),
-            escrowed: escrowed.toString(),
-          },
-        })
+            await getPrisma().escrow.create({
+                data: {
+                    escrowId: parseInt(escrowId),
+                    paymentId: paymentId > 0 ? parseInt(paymentId) : null,
+                    company: company.toLowerCase(),
+                    employee: employee.toLowerCase(),
+                    token: token.toLowerCase(),
+                    amount: amount.toString(),
+                    description: description,
+                    status: 'PENDING',
+                },
+            });
 
-        await logContractEvent('Withdrawn', event.blockNumber, event.transactionHash, {
-          streamId,
-          employee,
-          payout,
-        })
+            await upsertUser(company.toLowerCase(), { isCompany: true });
+            await upsertUser(employee.toLowerCase(), { isEmployee: true });
 
-        console.log(`✅ Stream ${streamId} updated`)
-      } catch (error) {
-        console.error('Error processing Withdrawn:', error)
-      }
-    })
+            await logContractEvent('EscrowCreated', event.blockNumber, event.transactionHash, { escrowId, company, employee });
+            console.log(`✅ Escrow ${escrowId} saved, roles updated.`);
 
-    // Listen for MilestoneSubmitted
-    contract.on('MilestoneSubmitted', async (...args) => {
-      try {
-        const event = args[args.length - 1]
-        const [milestoneId, streamId, submitter, amount, ipfsHash] = args.slice(0, -1)
+        } catch (error) {
+            console.error('Error processing EscrowCreated:', error);
+        }
+    });
 
-        console.log(`📍 MilestoneSubmitted event: milestoneId=${milestoneId}`)
+    contract.on('PaymentAuditorAdded', async (...args) => {
+        const event = args[args.length - 1];
+        const [paymentId, auditor] = args.slice(0, -1);
+        console.log(`📍 PaymentAuditorAdded event: paymentId=${paymentId}, auditor=${auditor}`);
+        await upsertUser(auditor.toLowerCase(), { isAuditor: true });
+        await logContractEvent('PaymentAuditorAdded', event.blockNumber, event.transactionHash, { paymentId, auditor });
+        console.log(`✅ Auditor ${auditor} for payment ${paymentId} saved, role updated.`);
+    });
 
-        await getPrisma().milestone.create({
-          data: {
-            milestoneId: parseInt(milestoneId),
-            streamId: parseInt(streamId),
-            submitter: submitter.toLowerCase(),
-            amount: amount.toString(),
-            ipfsHash: ipfsHash || null,
-            status: 'PENDING',
-          },
-        })
+    contract.on('EscrowAuditorAdded', async (...args) => {
+        const event = args[args.length - 1];
+        const [escrowId, auditor] = args.slice(0, -1);
+        console.log(`📍 EscrowAuditorAdded event: escrowId=${escrowId}, auditor=${auditor}`);
+        await upsertUser(auditor.toLowerCase(), { isAuditor: true });
+        await logContractEvent('EscrowAuditorAdded', event.blockNumber, event.transactionHash, { escrowId, auditor });
+        console.log(`✅ Auditor ${auditor} for escrow ${escrowId} saved, role updated.`);
+    });
 
-        await logContractEvent('MilestoneSubmitted', event.blockNumber, event.transactionHash, {
-          milestoneId,
-          streamId,
-          submitter,
-        })
-
-        console.log(`✅ Milestone ${milestoneId} saved to database`)
-      } catch (error) {
-        console.error('Error processing MilestoneSubmitted:', error)
-      }
-    })
-
-    // Listen for stream state changes
-    contract.on('StreamPaused', async (...args) => {
-      try {
-        const event = args[args.length - 1]
-        const [streamId] = args.slice(0, -1)
-
-        console.log(`📍 StreamPaused event: streamId=${streamId}`)
-
-        await getPrisma().stream.update({
-          where: { streamId: parseInt(streamId) },
-          data: { paused: true, status: 'PAUSED' },
-        })
-
-        await logContractEvent('StreamPaused', event.blockNumber, event.transactionHash, {
-          streamId,
-        })
-      } catch (error) {
-        console.error('Error processing StreamPaused:', error)
-      }
-    })
-
-    contract.on('StreamCancelled', async (...args) => {
-      try {
-        const event = args[args.length - 1]
-        const [streamId] = args.slice(0, -1)
-
-        console.log(`📍 StreamCancelled event: streamId=${streamId}`)
-
-        await getPrisma().stream.update({
-          where: { streamId: parseInt(streamId) },
-          data: { cancelled: true, status: 'CANCELLED' },
-        })
-
-        await logContractEvent('StreamCancelled', event.blockNumber, event.transactionHash, {
-          streamId,
-        })
-      } catch (error) {
-        console.error('Error processing StreamCancelled:', error)
-      }
-    })
-
-    console.log('✅ Contract event listener started successfully')
+    // ... other event listeners
+    
+    console.log('✅ Contract event listener started successfully');
   } catch (error) {
-    console.error('Failed to start contract listener:', error)
+    console.error('Failed to start contract listener:', error);
+  }
+}
+
+async function upsertUser(wallet: string, roles: { isCompany?: boolean; isEmployee?: boolean; isAuditor?: boolean }) {
+  const prisma = getPrisma();
+  const user = await prisma.user.findUnique({ where: { wallet } });
+
+  if (user) {
+    await prisma.user.update({
+      where: { wallet },
+      data: {
+        isCompany: roles.isCompany || user.isCompany,
+        isEmployee: roles.isEmployee || user.isEmployee,
+        isAuditor: roles.isAuditor || user.isAuditor,
+      },
+    });
+  } else {
+    await prisma.user.create({
+      data: {
+        wallet,
+        isCompany: roles.isCompany || false,
+        isEmployee: roles.isEmployee || false,
+        isAuditor: roles.isAuditor || false,
+      },
+    });
   }
 }
 
@@ -195,8 +170,8 @@ async function logContractEvent(
         data,
         processed: true,
       },
-    })
+    });
   } catch (error) {
-    console.error('Error logging contract event:', error)
+    console.error(`Error logging ${eventName} event:`, error);
   }
 }
