@@ -27,7 +27,7 @@ export default function LoginPage() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { verify, isVerifying } = useVerifyWallet(walletAddress);
+  const { verify, isVerifying } = useVerifyWallet();
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -65,7 +65,7 @@ export default function LoginPage() {
         const address = accounts[0];
         console.log("🎯 Setting wallet address:", address);
         setWalletAddress(address);
-        // Verify wallet will be called in useEffect
+        await verify(address); // Call verify immediately with the new address
       } else {
         throw new Error("No wallet accounts found");
       }
@@ -79,13 +79,6 @@ export default function LoginPage() {
       setIsConnecting(false);
     }
   };
-
-  // Verify wallet once address is available
-  useEffect(() => {
-    if (walletAddress && !isVerifying) {
-      verify();
-    }
-  }, [walletAddress, verify, isVerifying]);
 
   if (!isHydrated) {
     return (
