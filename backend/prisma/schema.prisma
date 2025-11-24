@@ -20,62 +20,61 @@ model User {
   @@index([wallet])
 }
 
-model Stream {
-  id                    Int     @id @default(autoincrement())
-  streamId              Int     @unique
-  company               String
-  employee              String
-  token                 String
-  totalAmount           String  // Store as string (big numbers)
-  startTime             BigInt
-  stopTime              BigInt
-  lastWithdrawTime      BigInt?
-  withdrawn             String  @default("0")
-  escrowBps             Int
-  escrowed              String  @default("0")
-  paused                Boolean @default(false)
-  cancelled             Boolean @default(false)
-  totalPausedDuration   BigInt  @default(0)
-  pausedAt              BigInt? @default(0)
-  status                String  @default("ACTIVE") // ACTIVE, PAUSED, CANCELLED
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+model Payment {
+  id                  Int      @id @default(autoincrement())
+  paymentId           Int      @unique
+  company             String
+  employee            String
+  token               String
+  totalAmount         String // Store as string (big numbers)
+  startTime           BigInt
+  stopTime            BigInt
+  lastWithdrawTime    BigInt?
+  withdrawn           String   @default("0")
+  paused              Boolean  @default(false)
+  cancelled           Boolean  @default(false)
+  totalPausedDuration BigInt   @default(0)
+  pausedAt            BigInt?  @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
-  milestones Milestone[]
+  escrows Escrow[]
 
+  @@index([company])
+  @@index([employee])
+}
+
+model Escrow {
+  id          Int      @id @default(autoincrement())
+  escrowId    Int      @unique
+  paymentId   Int?
+  company     String
+  employee    String
+  token       String
+  amount      String
+  description String
+  status      String   @default("PENDING") // PENDING, APPROVED, REJECTED, CLAIMED, CANCELLED
+  createdAt   DateTime @default(now())
+  approvedAt  DateTime?
+  claimedAt   DateTime?
+  updatedAt   DateTime @updatedAt
+
+  payment Payment? @relation(fields: [paymentId], references: [paymentId])
+
+  @@index([paymentId])
   @@index([company])
   @@index([employee])
   @@index([status])
 }
 
-model Milestone {
-  id          Int     @id @default(autoincrement())
-  milestoneId Int     @unique
-  streamId    Int
-  submitter   String
-  amount      String
-  status      String  @default("PENDING") // PENDING, APPROVED, REJECTED, CLAIMED
-  ipfsHash    String?
-  createdAt   DateTime @default(now())
-  approvedAt  DateTime?
-  approver    String?
-  updatedAt   DateTime @updatedAt
-
-  stream Stream @relation(fields: [streamId], references: [streamId])
-
-  @@index([streamId])
-  @@index([submitter])
-  @@index([status])
-}
-
 model ContractEvent {
-  id            Int     @id @default(autoincrement())
-  eventName     String  // StreamCreated, Withdrawn, MilestoneSubmitted, etc.
-  blockNumber   Int
-  transactionHash String @unique
-  data          Json    // Store full event data as JSON
-  processed     Boolean @default(false)
-  createdAt     DateTime @default(now())
+  id              Int      @id @default(autoincrement())
+  eventName       String // PaymentCreated, PaymentWithdrawn, EscrowCreated, etc.
+  blockNumber     Int
+  transactionHash String   @unique
+  data            Json // Store full event data as JSON
+  processed       Boolean  @default(false)
+  createdAt       DateTime @default(now())
 
   @@index([eventName])
   @@index([processed])

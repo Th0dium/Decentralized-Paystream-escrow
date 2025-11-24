@@ -22,7 +22,8 @@ contract Paystream is ReentrancyGuard, AccessControl {
         PENDING, // Created, waiting for approval
         APPROVED, // Auditor approved
         REJECTED, // Auditor rejected
-        CLAIMED // Employee claimed
+        CLAIMED, // Employee claimed
+        CANCELLED // Company cancelled
     }
 
     // ============ Structs ============
@@ -125,10 +126,10 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
     // Escrow events
     event EscrowCreated(
-        uint256 indexed escrowId,
+        uint256 escrowId,
         uint256 indexed paymentId,
         address indexed company,
-        address employee,
+        address indexed employee,
         address token,
         uint256 amount,
         string description
@@ -211,7 +212,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
         uint64 startTime,
         uint64 stopTime
     ) external nonReentrant returns (uint256) {
-        require(!newPaymentsPaused, "payment creation paused");
+        require(!newPaymentsPaused, "payment creation paused"); // For admin pause
         require(employee != address(0), "invalid employee");
         require(token != address(0), "invalid token");
         require(totalAmount >= MIN_PAYMENT_AMOUNT, "amount too small");
@@ -227,12 +228,19 @@ contract Paystream is ReentrancyGuard, AccessControl {
             feeAmount = (totalAmount * platformFeeBps) / 10000;
         }
 
+        require(totalAmount >= feeAmount, "amount less than fee");
+        uint256 streamAmount = totalAmount - feeAmount;
+        require(
+            streamAmount >= MIN_PAYMENT_AMOUNT,
+            "amount after fee too small"
+        );
+
         // Transfer funds
         IERC20 erc20 = IERC20(token);
         if (feeAmount > 0) {
             erc20.safeTransferFrom(msg.sender, feeRecipient, feeAmount);
         }
-        erc20.safeTransferFrom(msg.sender, address(this), totalAmount);
+        erc20.safeTransferFrom(msg.sender, address(this), streamAmount);
 
         // Create payment
         uint256 paymentId = _nextPaymentId++;
@@ -240,7 +248,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
             company: msg.sender,
             employee: employee,
             token: erc20,
-            totalAmount: totalAmount,
+            totalAmount: streamAmount,
             startTime: startTime,
             stopTime: stopTime,
             lastWithdrawTime: startTime,
@@ -268,20 +276,18 @@ contract Paystream is ReentrancyGuard, AccessControl {
     }
 
     /**
-     * @notice Calculate claimable amount for a payment
-     * @param paymentId Payment ID
-     * @return Claimable amount
+     * @notice Calculate accrued amount for a payment stream
+     * @param p The payment object
+     * @return The total amount accrued
      */
-    function claimablePayment(uint256 paymentId) public view returns (uint256) {
-        Payment storage p = payments[paymentId];
-        require(p.company != address(0), "payment does not exist");
-        if (p.cancelled) return 0;
-
+    function _getAccruedAmount(
+        Payment storage p
+    ) internal view returns (uint256) {
         uint64 nowTs = uint64(block.timestamp);
         if (nowTs < p.startTime) return 0;
 
         uint64 totalDuration = p.stopTime - p.startTime;
-        if (totalDuration == 0) return p.totalAmount - p.withdrawn;
+        if (totalDuration == 0) return p.totalAmount;
 
         uint64 rawElapsed = nowTs > p.stopTime
             ? totalDuration
@@ -293,7 +299,21 @@ contract Paystream is ReentrancyGuard, AccessControl {
             : 0;
 
         uint256 accrued = (p.totalAmount * workingTime) / totalDuration;
-        if (accrued > p.totalAmount) accrued = p.totalAmount;
+
+        return accrued > p.totalAmount ? p.totalAmount : accrued;
+    }
+
+    /**
+     * @notice Calculate claimable amount for a payment
+     * @param paymentId Payment ID
+     * @return Claimable amount
+     */
+    function claimablePayment(uint256 paymentId) public view returns (uint256) {
+        Payment storage p = payments[paymentId];
+        require(p.company != address(0), "payment does not exist");
+        if (p.cancelled) return 0;
+
+        uint256 accrued = _getAccruedAmount(p);
         if (accrued <= p.withdrawn) return 0;
 
         return accrued - p.withdrawn;
@@ -392,6 +412,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
         string calldata description,
         uint256 paymentId
     ) external nonReentrant returns (uint256) {
+        require(employee != msg.sender, "company cannot be employee");
         require(employee != address(0), "invalid employee");
         require(token != address(0), "invalid token");
         require(amount >= MIN_ESCROW_AMOUNT, "amount too small");
@@ -524,8 +545,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
             "cannot cancel"
         );
 
-        // Mark as rejected to prevent further actions
-        e.status = EscrowStatus.REJECTED;
+        e.status = EscrowStatus.CANCELLED;
 
         e.token.safeTransfer(e.company, e.amount);
 
@@ -539,6 +559,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
         require(p.company != address(0), "payment does not exist");
         require(msg.sender == p.company, "not company");
         require(auditor != address(0), "invalid auditor");
+        require(auditor != p.employee, "auditor cannot be employee");
 
         isPaymentAuditor[paymentId][auditor] = true;
         emit PaymentAuditorAdded(paymentId, auditor);
@@ -558,6 +579,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
         require(e.company != address(0), "escrow does not exist");
         require(msg.sender == e.company, "not company");
         require(auditor != address(0), "invalid auditor");
+        require(auditor != e.employee, "auditor cannot be employee");
         require(e.paymentId == 0, "use payment auditor for linked escrow");
 
         isEscrowAuditor[escrowId][auditor] = true;
@@ -651,25 +673,6 @@ contract Paystream is ReentrancyGuard, AccessControl {
     function getTotalEarned(uint256 paymentId) external view returns (uint256) {
         Payment storage p = payments[paymentId];
         require(p.company != address(0), "payment does not exist");
-
-        uint64 nowTs = uint64(block.timestamp);
-        if (nowTs < p.startTime) return 0;
-
-        uint64 totalDuration = p.stopTime - p.startTime;
-        if (totalDuration == 0) return p.totalAmount;
-
-        uint64 rawElapsed = nowTs > p.stopTime
-            ? totalDuration
-            : nowTs - p.startTime;
-        uint64 currentPauseDuration = p.paused ? nowTs - p.pausedAt : 0;
-        uint64 totalPausedTime = p.totalPausedDuration + currentPauseDuration;
-        uint64 workingTime = rawElapsed > totalPausedTime
-            ? rawElapsed - totalPausedTime
-            : 0;
-
-        uint256 accrued = (p.totalAmount * workingTime) / totalDuration;
-        if (accrued > p.totalAmount) accrued = p.totalAmount;
-
-        return accrued;
+        return _getAccruedAmount(p);
     }
 }
