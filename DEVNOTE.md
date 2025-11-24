@@ -1,249 +1,88 @@
 # Paystream Architecture Decisions
 
-Complete architectural documentation for the Paystream decentralized salary streaming platform.
+This document outlines the key architectural decisions for the Paystream project, covering the smart contract, backend, and frontend.
 
 ---
 
-## 1. Hybrid Payment Model: Streaming + Milestone Escrow
+## 1. Smart Contract: Dual Protocol Model
 
-**Decision:** Combine continuous salary streaming with milestone-based escrow in a single stream.
+**Decision:** Implement two separate but related protocols within a single `Paystream.sol` contract: a Payment Protocol for time-based streaming and an Escrow Protocol for milestone-based payments.
 
 **Why:**
-- Employees get regular cash flow (streaming portion)
-- Companies get accountability (escrow released only after milestone approval)
-- Single stream handles both base salary and performance bonuses
+- **Clarity:** Separating the logic for streaming and escrow makes the contract easier to understand and audit.
+- **Flexibility:** Companies can choose the protocol that best suits their needs—streaming for salaries, escrow for project milestones, or both.
+- **Gas Efficiency:** Users only interact with the parts of the contract they need, avoiding unnecessary gas costs.
 
 **How it works:**
-- `escrowBps` parameter defines what percentage goes to escrow (e.g., 3000 = 30%)
-- On withdrawal: 70% paid immediately, 30% locked in escrow
-- Escrowed funds released only after auditor approves milestone
+- **Payment Protocol:** Creates a stream that unlocks tokens linearly over time. The employee can withdraw accrued funds at any point.
+- **Escrow Protocol:** Creates a milestone-based payment that is locked until an auditor approves it. Escrows can be standalone or linked to a payment stream.
 
 ---
 
-## 2. Role-Based Access Control
+## 2. Roles and Permissions
 
-**Decision:** Three distinct roles with clear permissions using OpenZeppelin AccessControl.
+**Decision:** Use a role-based system to manage access and permissions, leveraging OpenZeppelin's `AccessControl`.
 
 **Roles:**
-1. **Platform Admin** - Global settings (fees, pause new streams)
-2. **Company** - Creates streams, manages pause/cancel, assigns auditors
-3. **Employee** - Withdraws earnings, submits milestones, claims escrow
-4. **Stream Auditor** - Approves/rejects milestones (assigned per-stream by company)
+1.  **Admin (`DEFAULT_ADMIN_ROLE`):** Manages contract-level settings like platform fees and can pause the creation of new payments.
+2.  **Company:** Creates payment streams and escrows, and assigns auditors.
+3.  **Employee:** The recipient of payments and escrows. Can withdraw from streams and claim approved escrows.
+4.  **Auditor:** Approves or rejects escrows. Auditors are assigned by the company on a per-payment or per-escrow basis.
 
-**Why:** Security through separation of duties. Each role can only perform their intended actions.
-
----
-
-## 3. Pause Mechanism with Working Time Calculation
-
-**Decision:** Pausing a stream freezes earnings by tracking cumulative paused time.
-
-**Why:** Fair to employees - they only get paid for actual working time, not paused periods.
-
-**How it works:**
-- `totalPausedDuration` accumulates all completed pause periods
-- `pausedAt` marks when current pause started
-- Earnings = (totalAmount × workingTime) / totalDuration
-- workingTime = elapsed - totalPausedDuration - currentPauseDuration
-
-**Result:** Employee working 21 days in a 30-day period (9 days paused) earns 21/30 of total amount.
+**Why:** This separation of concerns enhances security by ensuring that each participant only has the permissions necessary for their role.
 
 ---
 
-## 4. Backend Event Indexer
+## 3. Backend Event Indexer
 
-**Decision:** Node.js backend continuously listens to contract events and indexes them in PostgreSQL database.
+**Decision:** A Node.js backend listens for events emitted by the smart contract and indexes them in a PostgreSQL database.
 
 **Why:**
-- **Performance:** Querying blockchain for "all streams for this user" requires checking every stream (slow, expensive)
-- **UX:** Backend returns results instantly from database
-- **Scalability:** Works efficiently even with thousands of streams
-
-**What it does:**
-- Listens to all contract events (StreamCreated, Withdrawn, MilestoneSubmitted, etc.)
-- Stores event data in normalized database tables
-- Provides REST API for frontend to query indexed data
-
-**Key endpoints:**
-- `GET /api/user/:address/roles` - What roles does this wallet have?
-- `GET /api/employee/:address/streams` - All streams for employee
-- `GET /api/company/:address/streams` - All streams created by company
-- `GET /api/milestones/pending` - Pending milestones for auditor
+- **Performance:** Direct blockchain queries for historical data are slow and resource-intensive. The indexed database provides a fast and efficient way to retrieve information.
+- **Enhanced UX:** The frontend can quickly fetch data like a user's payment streams or escrows, providing a smoother user experience.
+- **Scalability:** This approach scales well, even with a large number of on-chain transactions.
 
 ---
 
-## 5. Milestone Content Storage
+## 4. Frontend and State Management
 
-**Decision:** Store milestone evidence (descriptions, links, screenshots) in backend database, not on-chain.
+**Decision:** The frontend is built with Next.js, TypeScript, and Tailwind CSS. It interacts with both the blockchain (for transactions) and the backend (for data).
 
-**Why:**
-- **Cost:** On-chain storage costs $5-50 per milestone. Database costs $0.
-- **Flexibility:** Content can be updated if auditor requests changes
-- **Practicality:** Can store images, PDFs, long descriptions
-
-**How it works:**
-1. Employee submits milestone content to backend API
-2. Backend stores in database, returns content ID
-3. Frontend submits transaction to blockchain with content ID
-4. Auditor fetches full content from backend when reviewing
-
-**Trade-off:** Backend is centralized point. Future enhancement: add IPFS backup for decentralization.
+**State Management Philosophy:**
+- **Blockchain as the Single Source of Truth:** All financial states and transactions are managed by the smart contract.
+- **Backend as a Fast Read-Layer:** The backend provides a cached, indexed version of the blockchain data for quick retrieval.
+- **Frontend State:** The frontend does not cache financial data. It fetches data from the backend for display and initiates transactions with the blockchain. After a transaction, it re-fetches data to ensure the UI is up-to-date.
 
 ---
 
-## 6. Multi-Role Wallet Handling
+## 5. Authentication
 
-**Decision:** One wallet address can have multiple roles simultaneously. Frontend adapts based on backend response.
+**Decision:** Wallet-based authentication is used. Users sign a message to prove ownership of their address, and the backend issues a session token (JWT) for subsequent API requests.
 
-**Why:** Real users might be company for some streams, employee for others, auditor for third streams.
-
-**Flow:**
-1. User connects wallet
-2. Frontend queries backend: "What roles does this address have?"
-3. Backend checks indexed data, returns all roles
-4. If single role → auto-redirect to that dashboard
-5. If multiple roles → show selection UI
-6. If no roles → show onboarding
-
----
-
-## 7. Frontend Stack
-
-**Decision:** Next.js 14 + TypeScript + Tailwind CSS + Zustand
-
-**Why:**
-- Next.js: Modern React framework with routing, SSR, optimizations
-- TypeScript: Type safety across frontend and API integration
-- Tailwind: Fast styling without CSS bloat
-- Zustand: Lightweight state management (simpler than Redux)
-
-**Structure:**
-```
-app/ - Pages and routing
-components/ - Reusable UI (buttons, cards, forms)
-lib/ - API client, hooks, utilities, auth store
-```
-
-**Role-based routes:**
-- `/dashboard/employee/*` - Employee view
-- `/dashboard/company/*` - Company view
-- `/dashboard/auditor/*` - Auditor view
-
----
-
-## 8. State Management: Blockchain as Source of Truth
-
-**Decision:** Blockchain holds authoritative financial state. Backend mirrors for fast reads. Frontend never caches money data.
-
-**Rules:**
-- **Financial operations** (withdraw, claim) → Always check blockchain for latest state
-- **Display data** (lists, history) → Query backend for speed
-- **After transaction** → Frontend refetches from backend (which re-indexed from blockchain)
-
-**Why:** Prevents showing stale balances while maintaining fast UX.
-
----
-
-## 9. Authentication
-
-**Decision:** Wallet-based authentication only. No email/password.
-
-**How:**
-- User signs message with wallet
-- Backend verifies signature matches wallet address
-- Session token issued for API calls
-
-**Why:** Web3 native, no custodial risk, simple.
-
----
-
-## 10. Deployment Strategy
-
-**Decision:** Deploy smart contract, backend, and frontend separately.
-
-**Environments:**
-- **Development:** Sepolia testnet + local backend + local frontend
-- **Production:** Ethereum mainnet + Railway backend + Vercel frontend
-
-**Why:** Independent scaling. Backend can update without redeploying contract. Frontend deploys instantly.
-
----
-
-## 11. Error Handling & Transaction UX
-
-**Decision:** Clear transaction states with user feedback at every step.
-
-**Implementation:**
-- Show loading state during transaction submission
-- Display transaction hash with Etherscan link
-- Poll for confirmation (don't assume success)
-- Show clear error messages if transaction reverts
-- Update UI only after blockchain confirms
-
-**Why:** Users need to understand what's happening with their money.
-
----
-
-## Current Implementation Status
-
-### ✅ Completed
-- **Frontend**: Next.js 14 setup with Phantom wallet integration, Zustand auth store, role-based routing
-- **Backend API**: Express.js server with Prisma ORM, PostgreSQL database
-- **Authentication**: Wallet verification endpoint (`/auth/verify-wallet`) with JWT token generation
-- **Database Schema**: User, Stream, Milestone, ContractEvent models
-- **Deployed Infrastructure**:
-  - Frontend: Vercel
-  - Backend: Railway
-  - Database: Neon PostgreSQL (cloud)
-- **API Endpoints**: All CRUD endpoints for streams and milestones
-
-### 🚧 In Progress / Needs Implementation
-- **Event Indexing**: ContractListener service (structure exists, needs blockchain event listening)
-- **Smart Contract Integration**: Contract deployment and event emission
-- **Multi-role Wallet Support**: Current backend returns single role per user
-- **Role-based Middleware**: Validate roles for protected operations
-- **IPFS Integration**: Backup storage for milestone content
-- **Transaction UX**: Etherscan links, polling, error feedback
-- **Pause Mechanism Logic**: Full pause/resume functionality
-- **Comprehensive Error Handling**: Better error messages and validation
-
-### 📋 Not Started
-- **Smart Contract Tests**: Hardhat test suite
-- **Backend Integration Tests**: Event indexing and API tests
-- **Frontend E2E Tests**: Critical user flows
-
----
-
-## 12. Testing Approach
-
-**Contract:** Hardhat tests for all financial logic, pause mechanics, access control
-**Backend:** Integration tests for event indexing and API endpoints
-**Frontend:** E2E tests for critical flows (create stream, withdraw, submit milestone)
+**Why:** This is the standard for Web3 applications, providing a secure and user-friendly way to authenticate without relying on traditional email/password credentials.
 
 ---
 
 ## Architecture Summary
 
 ```
-┌─────────────────────────────────────────┐
-│  FRONTEND (Next.js on Vercel)          │
-│  - User interface                       │
-│  - Wallet connection                    │
-│  - Transaction submission               │
-└─────────────────────────────────────────┘
-         ↓ ↑ (reads)          ↓ (writes)
+┌────────────────────────────────┐
+│  Frontend (Next.js on Vercel)  │
+│  - UI & Wallet Interaction     │
+│  - Sends Transactions          │
+└────────────────────────────────┘
+         ↓ ↑ (API Calls)      ↓ (Transactions)
          ↓ ↑                  ↓
 ┌──────────────────┐    ┌──────────────────┐
-│  BACKEND (API)   │    │  BLOCKCHAIN      │
-│  - Event indexer │←───│  Smart Contract  │
-│  - Fast queries  │    │  - Money logic   │
-│  - Milestone DB  │    │  - Access control│
+│  Backend (Node.js) │    │   Blockchain     │
+│  - Event Indexer  │←───┤ (Paystream.sol)  │
+│  - Database (SQL)│    │   - Holds Funds    │
+│  - REST API      │    │   - Enforces Rules │
 └──────────────────┘    └──────────────────┘
 ```
 
-**Data flow:**
-- Writes (transactions) → Frontend → Blockchain
-- Blockchain emits events → Backend indexes
-- Reads (queries) → Frontend → Backend → Fast response
-
-**Result:** Decentralized money logic + centralized performance layer.
+**Workflow:**
+1.  **Write Operations (e.g., creating a payment):** The frontend prompts the user to sign a transaction, which is sent directly to the blockchain.
+2.  **Events:** The smart contract emits an event upon a successful transaction.
+3.  **Indexing:** The backend service listens for these events and updates the database.
+4.  **Read Operations (e.g., viewing payments):** The frontend queries the backend's REST API, which returns the indexed data from the database.

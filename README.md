@@ -1,53 +1,34 @@
-# Paystream Escrow MVP
+# Paystream
 
-A decentralized salary streaming and milestone-based escrow system built on Solidity.
+A decentralized payment streaming and milestone-based escrow system built on Solidity.
 
 ## Overview
 
-Paystream Escrow enables companies to stream salary payments to employees with built-in escrow for milestone-based verification. The system consists of three main components:
+Paystream is a unified contract that handles two distinct payment protocols:
 
-### 1. Salary Streaming Contract
-- Companies deposit tokens for employees
-- Money unlocks per second (calculated mathematically)
-- Employees can withdraw available amount at any time
-- Companies can pause, resume, or cancel streams
-- Automatic refund on cancellation
+### 1. Payment Protocol (Time-Based Streaming)
+- Companies can create payment streams for employees that unlock tokens over a specified duration.
+- Employees can withdraw their accrued funds at any time.
+- Companies retain control to pause, resume, or cancel streams.
 
-### 2. Milestone Escrow
-- 30% of streamed salary automatically goes into escrow
-- Employees submit milestones with IPFS evidence
-- Auditors approve or reject submissions
-- Upon approval, employees claim escrowed funds
-- Rejected funds return to available escrow
+### 2. Escrow Protocol (Milestone-Based Payments)
+- Companies can create milestone-based escrows for employees.
+- Each escrow must be approved by a designated auditor before the employee can claim the funds.
+- Escrows can be standalone or linked to a payment stream.
 
-### 3. Access Control
-Three distinct roles with specific permissions:
-- **Company**: Create and manage salary streams
-- **Employee**: Withdraw available funds and submit milestones
-- **Auditor**: Approve or reject milestone submissions
+This dual-protocol approach allows for flexible compensation models, from simple salary streams to complex project-based payments.
 
 ## Project Structure
 
 ```
 contracts/
-├── core/
-│   ├── SalaryStreamEscrow.sol     # Core streaming logic
-│   └── MilestoneEscrow.sol         # Milestone and escrow management
-├── tokens/
-│   └── PaymentToken.sol            # ERC20 token for payments
-└── access/
-    └── AccessControl.sol           # Role-based access control
+└── Paystream.sol          # Unified streaming and escrow logic
 
 test/
-├── fixtures/
-│   └── setup.ts                    # Test setup utilities
-└── unit/
-    ├── AccessControl.test.ts
-    ├── SalaryStreamEscrow.test.ts
-    └── MilestoneEscrow.test.ts
+└── Paystream.ts           # Tests for the Paystream contract
 
 scripts/
-└── deploy.ts                       # Deployment script
+└── deploy.ts              # Deployment script
 ```
 
 ## Installation
@@ -58,17 +39,16 @@ npm install
 
 ## Configuration
 
-Copy `.env.example` to `.env.local` and fill in your values:
+Copy `.env.example` to `.env` and fill in your values:
 
 ```bash
-cp .env.example .env.local
+cp .env.example .env
 ```
 
 Environment variables:
-- `SEPOLIA_RPC_URL`: Sepolia testnet RPC endpoint
-- `PRIVATE_KEY`: Private key for deployment account
-- `REPORT_GAS`: Enable gas reporting (true/false)
-- `ETHERSCAN_API_KEY`: For contract verification
+- `SEPOLIA_RPC_URL`: Sepolia testnet RPC endpoint.
+- `PRIVATE_KEY`: Private key for the deployment account.
+- `ETHERSCAN_API_KEY`: For contract verification on Etherscan.
 
 ## Usage
 
@@ -82,11 +62,6 @@ npm run compile
 npm run test
 ```
 
-### Run Specific Test File
-```bash
-npm run test test/unit/SalaryStreamEscrow.test.ts
-```
-
 ### Deploy Contracts
 ```bash
 # Local/Hardhat
@@ -96,148 +71,72 @@ npm run deploy
 npm run deploy:sepolia
 ```
 
-### Type Check
-```bash
-npm run typecheck
-```
+## Contract Functions
 
-## Contract Interfaces
+### Admin Functions
+Functions for managing contract-level settings.
 
-### SalaryStreamEscrow
+- `setNewPaymentsPause(bool status)`: Pause or resume the creation of new payments.
+- `setPlatformFee(uint16 newFeeBps)`: Set the platform fee in basis points.
+- `setFeeRecipient(address newRecipient)`: Set the address that receives platform fees.
 
-#### Creating a Stream
-```solidity
-function createStream(
-    address employee,
-    uint256 totalAmount,
-    uint256 duration
-) external returns (uint256 streamId)
-```
+### Payment Protocol Functions
+Functions for managing time-based payment streams.
 
-#### Withdrawing Funds
-```solidity
-function withdraw(uint256 streamId, uint256 amount) external
-```
+- `createPayment(...)`: Creates a new payment stream.
+- `withdrawPayment(uint256 paymentId)`: Allows an employee to withdraw accrued funds.
+- `pausePayment(uint256 paymentId)`: Pauses a payment stream.
+- `resumePayment(uint256 paymentId)`: Resumes a paused payment stream.
+- `cancelPayment(uint256 paymentId)`: Cancels a payment stream and refunds the remainder to the company.
+- `claimablePayment(uint256 paymentId)`: View function to check the amount available for withdrawal.
+- `addPaymentAuditor(uint256 paymentId, address auditor)`: Adds an auditor to a payment stream.
+- `removePaymentAuditor(uint256 paymentId, address auditor)`: Removes an auditor from a payment stream.
 
-#### Managing Streams
-```solidity
-function pauseStream(uint256 streamId) external
-function resumeStream(uint256 streamId) external
-function cancelStream(uint256 streamId) external
-```
+### Escrow Protocol Functions
+Functions for managing milestone-based escrows.
 
-#### Querying
-```solidity
-function getAvailableAmount(uint256 streamId) public view returns (uint256)
-function getTotalUnlockedAmount(uint256 streamId) public view returns (uint256)
-function getStreamDetails(uint256 streamId) external view returns (...)
-function getEmployeeStreams(address employee) external view returns (uint256[])
-function getCompanyStreams(address company) external view returns (uint256[])
-```
+- `createEscrow(...)`: Creates a new escrow.
+- `approveEscrow(uint256 escrowId)`: Allows an auditor to approve an escrow.
+- `rejectEscrow(uint256 escrowId)`: Allows an auditor to reject an escrow.
+- `claimEscrow(uint256 escrowId)`: Allows an employee to claim an approved escrow.
+- `cancelEscrow(uint256 escrowId)`: Allows a company to cancel a pending or rejected escrow.
+- `addEscrowAuditor(uint256 escrowId, address auditor)`: Adds an auditor to a standalone escrow.
+- `removeEscrowAuditor(uint256 escrowId, address auditor)`: Removes an auditor from a standalone escrow.
 
-### MilestoneEscrow
+### View Functions
+General-purpose functions for retrieving information.
 
-#### Locking Escrow (Called during Withdrawal)
-```solidity
-function lockEscrow(uint256 streamId, uint256 withdrawnAmount) external returns (uint256)
-```
-
-#### Submitting Milestone
-```solidity
-function submitMilestone(
-    uint256 streamId,
-    uint256 amount,
-    string calldata ipfsHash
-) external returns (uint256 milestoneId)
-```
-
-#### Approving/Rejecting
-```solidity
-function approveMilestone(uint256 milestoneId) external
-function rejectMilestone(uint256 milestoneId) external
-```
-
-#### Claiming Funds
-```solidity
-function claimMilestone(uint256 milestoneId) external
-```
-
-#### Querying
-```solidity
-function getEscrowBalance(uint256 streamId) external view returns (uint256)
-function getEmployeeMilestones(address employee) external view returns (uint256[])
-function getStreamMilestones(uint256 streamId) external view returns (uint256[])
-function getMilestoneDetails(uint256 milestoneId) external view returns (...)
-```
-
-### AccessControl
-
-#### Managing Roles
-```solidity
-function grantRole(bytes32 role, address account) external
-function revokeRole(bytes32 role, address account) external
-function hasRole(bytes32 role, address account) external view returns (bool)
-```
-
-#### Roles
-```solidity
-bytes32 public constant COMPANY_ROLE = keccak256("COMPANY_ROLE");
-bytes32 public constant EMPLOYEE_ROLE = keccak256("EMPLOYEE_ROLE");
-bytes32 public constant AUDITOR_ROLE = keccak256("AUDITOR_ROLE");
-```
+- `getPayment(uint256 paymentId)`: Returns details of a payment.
+- `getEscrow(uint256 escrowId)`: Returns details of an escrow.
+- `getEmployeePayments(address employee)`: Returns all payment IDs for an employee.
+- `getCompanyPayments(address company)`: Returns all payment IDs for a company.
+- `getEmployeeEscrows(address employee)`: Returns all escrow IDs for an employee.
+- `getCompanyEscrows(address company)`: Returns all escrow IDs for a company.
+- `getPaymentEscrows(uint256 paymentId)`: Returns all escrow IDs linked to a payment.
+- `getClaimableEscrows(address employee)`: Returns all approved escrows for an employee.
+- `getTotalEarned(uint256 paymentId)`: Returns the total amount earned in a stream (withdrawn + claimable).
 
 ## Key Features
 
 ### Security
-- **ReentrancyGuard**: Protects against reentrancy attacks
-- **Role-Based Access Control**: Ensures only authorized actors can perform actions
-- **Safe Math**: Uses Solidity 0.8.24 built-in overflow protection
-- **Pausable Streams**: Companies can pause streams to prevent unexpected funds flow
+- **Reentrancy Guard**: Protects against reentrancy attacks on key functions.
+- **Access Control**: Role-based access ensures that only authorized addresses can perform sensitive actions.
+- **Pausable Contract**: Admins can pause the creation of new payments.
+- **Auditor Approval**: Escrows require auditor sign-off, preventing unauthorized fund claims.
 
 ### Functionality
-- **Time-Based Unlocking**: Funds unlock linearly per second
-- **Flexible Withdrawals**: Employees can withdraw at any time without penalty
-- **Escrow Percentage**: Fixed 30% escrow for milestone verification
-- **IPFS Evidence**: Milestones reference IPFS hashes for decentralized evidence storage
-- **Audit Trail**: All actions emit events for transparency
-
-## Testing
-
-The test suite covers:
-- ✅ Role-based access control
-- ✅ Stream creation and management
-- ✅ Withdrawal mechanics
-- ✅ Escrow locking and unlocking
-- ✅ Milestone submission, approval, and claiming
-- ✅ Edge cases and error conditions
-
-Run full test suite:
-```bash
-npm run test
-```
-
-## Gas Optimization
-
-The contracts use the following optimizations:
-- `optimizer: true` with `runs: 200`
-- Efficient storage layout
-- Minimal state changes per operation
-- Batch operations where possible
+- **Dual Payment Models**: Supports both continuous streaming and discrete milestone payments.
+- **Flexible Escrows**: Escrows can be independent or linked to payment streams.
+- **Platform Fees**: A configurable fee can be taken on payments.
+- **Comprehensive Event Logs**: All major actions emit events for transparency and off-chain tracking.
 
 ## Future Enhancements
 
-- [ ] Multi-token support
-- [ ] Tiered escrow percentages
-- [ ] Timelock for milestone approvals
-- [ ] Bulk stream creation
-- [ ] Frontend application
-- [ ] Subgraph for indexing
-- [ ] Governance for escrow percentage changes
+- [ ] Multi-token support within a single stream/escrow.
+- [ ] Governance mechanism for protocol parameters.
+- [ ] Frontend application for interacting with the contract.
+- [ ] Subgraph for efficient data querying.
 
 ## License
 
 MIT
-
-## Support
-
-For issues and questions, please refer to the contract documentation or create an issue in the repository.
