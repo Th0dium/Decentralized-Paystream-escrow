@@ -1,18 +1,20 @@
 // Authentication types
-export type UserRole = "COMPANY" | "EMPLOYEE" | "AUDITOR" | null;
-
 export interface AuthResponse {
   success: boolean;
   data: {
     walletAddress: string;
-    role: UserRole;
+    isCompany: boolean;
+    isEmployee: boolean;
+    isAuditor: boolean;
     isNewUser?: boolean;
   };
 }
 
 export interface AuthState {
   isAuthenticated: boolean;
-  role: UserRole;
+  isCompany: boolean;
+  isEmployee: boolean;
+  isAuditor: boolean;
   walletAddress: string | null;
   loading: boolean;
   error: string | null;
@@ -29,7 +31,6 @@ export interface Stream {
   stopTime: number;
   lastWithdrawTime: number;
   withdrawn: string;
-  escrowBps: number;
   escrowed: string;
   paused: boolean;
   cancelled: boolean;

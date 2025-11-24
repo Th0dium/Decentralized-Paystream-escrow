@@ -9,10 +9,15 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 /**
  * @title Paystream
  * @dev Unified contract with 2 separate protocols:
- * - Payment Protocol: Pure time-based streaming (no escrow)
- * - Escrow Protocol: Milestone-based payments with auditor approval
+ * - Payment Protocol: Time-based streaming payments.
+ * - Escrow Protocol: Milestone-based payments requiring auditor approval.
  *
- * Company can use Payment-only, Escrow-only, or both together.
+ * @notice This contract manages the on-chain logic for payment streams and escrows.
+ * The roles of "Company", "Employee", and "Auditor" are defined contextually per payment/escrow.
+ * An off-chain backend service is expected to manage user profiles and persistent roles.
+ * - A user becomes a "Company" by creating a payment stream.
+ * - A user becomes an "Employee" by being the recipient of a stream or escrow.
+ * - A user becomes an "Auditor" by being assigned to a stream or escrow for oversight.
  */
 contract Paystream is ReentrancyGuard, AccessControl {
     using SafeERC20 for IERC20;

@@ -4,8 +4,8 @@ import { config } from './config/env'
 import { errorHandler } from './middleware/errorHandler'
 import { startContractListener } from './services/contractListener'
 import authRoutes from './routes/auth'
-import streamsRoutes from './routes/streams'
-import milestonesRoutes from './routes/milestones'
+import paymentsRoutes from './routes/payments'
+import escrowsRoutes from './routes/escrows'
 import { PrismaClient } from '@prisma/client'
 
 const app = express()
@@ -39,8 +39,8 @@ app.use(express.json())
 
 // Routes
 app.use('/auth', authRoutes)
-app.use('/streams', streamsRoutes)
-app.use('/milestones', milestonesRoutes)
+app.use('/payments', paymentsRoutes)
+app.use('/escrows', escrowsRoutes)
 
 // Health check endpoint with database status
 app.get('/health', async (req, res) => {

@@ -18,6 +18,18 @@ Paystream is a unified contract that handles two distinct payment protocols:
 
 This dual-protocol approach allows for flexible compensation models, from simple salary streams to complex project-based payments.
 
+## User Roles and Application Logic
+
+While the `Paystream.sol` contract defines roles like "company", "employee", and "auditor" within the context of a specific stream or escrow, the broader user roles are managed by an off-chain backend application. This separation allows for more flexible user management and a richer user experience.
+
+-   **Initial State**: A new user signing into the application has no specific roles.
+-   **Becoming a Company**: Any user who creates a payment stream is designated as a "Company" in the application. This unlocks company-specific features.
+-   **Becoming an Employee**: A user becomes an "Employee" when they are designated as the recipient of a payment stream or escrow.
+-   **Becoming an Auditor**: A user becomes an "Auditor" when they are assigned to oversee a stream or escrow.
+-   **Access Control**: Each role unlocks specific UI components and functionality within the application, tailored to their responsibilities.
+
+The on-chain contract remains the source of truth for fund management, while the off-chain application manages user profiles and application state.
+
 ## Project Structure
 
 ```

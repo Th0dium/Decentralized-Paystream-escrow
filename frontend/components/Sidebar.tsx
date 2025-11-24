@@ -6,39 +6,39 @@ import { useAuth } from "@/lib/hooks";
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { role } = useAuth();
+  const { isCompany, isEmployee, isAuditor } = useAuth();
 
   const menuItems = [
     { href: "/dashboard", label: "Overview", show: true },
     {
       href: "/dashboard/employee/streams",
       label: "My Streams",
-      show: role === "EMPLOYEE",
+      show: isEmployee,
     },
     {
       href: "/dashboard/employee/withdraw",
       label: "Withdraw",
-      show: role === "EMPLOYEE",
+      show: isEmployee,
     },
     {
       href: "/dashboard/employee/milestones",
       label: "My Milestones",
-      show: role === "EMPLOYEE",
+      show: isEmployee,
     },
     {
       href: "/dashboard/company/create-stream",
       label: "Create Stream",
-      show: role === "COMPANY" || !role,
+      show: true, // Anyone can create a stream
     },
     {
       href: "/dashboard/company/streams",
       label: "Manage Streams",
-      show: role === "COMPANY",
+      show: isCompany,
     },
     {
       href: "/dashboard/auditor/milestones",
       label: "Review Milestones",
-      show: role === "AUDITOR",
+      show: isAuditor,
     },
   ];
 

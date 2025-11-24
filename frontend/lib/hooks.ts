@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuthStore } from "./auth-store";
-import { authApi, streamsApi, milestonesApi } from "./api-client";
+import { authApi, paymentsApi, escrowsApi } from "./api-client";
 import { AuthResponse, Stream, Milestone } from "./types";
 
 // Hook for auth
@@ -36,13 +36,13 @@ export const useVerifyWallet = () => {
         const response: AuthResponse = await authApi.verifyWallet(address);
         console.log("📥 Backend response:", response);
         if (response.success) {
-          console.log("✅ Wallet verified! Role:", response.data.role);
-          authStore.setAuth(response.data.walletAddress, response.data.role);
-        } else {
-          console.error("❌ Verification failed:", response);
-          authStore.setError("Failed to verify wallet");
-        }
-      } catch (error) {
+                  console.log("✅ Wallet verified!");
+                  const { walletAddress, isCompany, isEmployee, isAuditor } = response.data;
+                  authStore.setAuth(walletAddress, isCompany, isEmployee, isAuditor);
+                } else {
+                  console.error("❌ Verification failed:", response);
+                  authStore.setError("Failed to verify wallet");
+                }      } catch (error) {
         const errorMsg = error instanceof Error ? error.message : "Verification failed";
         console.error("❌ Verification error:", errorMsg);
         authStore.setError(errorMsg);
@@ -67,7 +67,7 @@ export const useEmployeeStreams = (walletAddress: string | null) => {
     if (walletAddress) {
       setLoading(true);
       try {
-        const response = await streamsApi.getEmployeeStreams(walletAddress);
+        const response = await paymentsApi.getEmployeeStreams(walletAddress);
         setStreams(response.data || []);
         setError(null); // Clear previous errors
       } catch (err) {
@@ -97,7 +97,7 @@ export const useCompanyStreams = (walletAddress: string | null) => {
     if (walletAddress) {
       setLoading(true);
       try {
-        const response = await streamsApi.getCompanyStreams(walletAddress);
+        const response = await paymentsApi.getCompanyStreams(walletAddress);
         setStreams(response.data || []);
         setError(null); // Clear previous errors
       } catch (err) {
@@ -127,7 +127,7 @@ export const useEmployeeMilestones = (walletAddress: string | null) => {
     if (walletAddress) {
       setLoading(true);
       try {
-        const response = await milestonesApi.getEmployeeMilestones(walletAddress);
+        const response = await escrowsApi.getEmployeeMilestones(walletAddress);
         setMilestones(response.data || []);
         setError(null);
       } catch (err) {
@@ -156,7 +156,7 @@ export const usePendingMilestones = () => {
   const refetch = async () => {
     setLoading(true);
     try {
-      const response = await milestonesApi.getPendingMilestones();
+      const response = await escrowsApi.getPendingMilestones();
       setMilestones(response.data || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch milestones");

@@ -11,11 +11,13 @@ datasource db {
 }
 
 model User {
-  id        Int     @id @default(autoincrement())
-  wallet    String  @unique
-  role      String? // "COMPANY", "EMPLOYEE", "AUDITOR", or null
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         Int      @id @default(autoincrement())
+  wallet     String   @unique
+  isCompany  Boolean  @default(false)
+  isEmployee Boolean  @default(false)
+  isAuditor  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@index([wallet])
 }
