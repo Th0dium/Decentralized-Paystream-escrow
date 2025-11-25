@@ -1,17 +1,16 @@
 import axios from "axios";
-import { ApiResponse, AuthResponse, Stream, Milestone } from "./types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-const API_TIMEOUT = parseInt(process.env.NEXT_PUBLIC_API_TIMEOUT || "10000");
+import type { ApiResponse, AuthResponse, Stream, Milestone } from "./types";
+import { API_CONFIG, STORAGE_KEYS } from "./constants";
 
 const apiClient = axios.create({
-  baseURL: API_URL,
-  timeout: API_TIMEOUT,
+  baseURL: API_CONFIG.BASE_URL,
+  timeout: API_CONFIG.TIMEOUT,
 });
 
 apiClient.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
-    const token = localStorage.getItem("authToken");
+    const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }

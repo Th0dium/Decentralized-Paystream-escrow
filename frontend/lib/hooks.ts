@@ -1,29 +1,78 @@
 import { useCallback, useEffect, useState } from "react";
+import { useAccount, useDisconnect } from "wagmi";
+
 import { useAuthStore } from "./auth-store";
 import { authApi, paymentsApi, escrowsApi } from "./api-client";
-import { AuthResponse, Stream, Milestone } from "./types";
+import { STORAGE_KEYS } from "./constants";
+import type { AuthResponse, Stream, Milestone } from "./types";
 
-// Hook for auth with proper hydration handling
+/**
+ * Main auth hook that combines wallet connection with backend authentication
+ */
 export const useAuth = () => {
-  const auth = useAuthStore();
   const [isHydrated, setIsHydrated] = useState(false);
+  const { address: walletAddress, isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
+  const store = useAuthStore();
 
+  // Hydrate from localStorage on mount (once)
   useEffect(() => {
-    // Initialize from localStorage only once on mount
-    auth.initFromStorage();
+    store.hydrate();
     setIsHydrated(true);
-  }, []); // Empty deps - run only once
+  }, []);
 
-  // Return auth state, but only mark as ready once hydrated
+  // Auto-logout if wallet disconnected or address changed
+  useEffect(() => {
+    if (!isHydrated) return;
+
+    // If we have stored auth but no wallet connected -> logout
+    if (store.walletAddress && !isConnected) {
+      store.logout();
+      return;
+    }
+
+    // If wallet connected but address doesn't match stored -> logout
+    if (isConnected && store.walletAddress && walletAddress) {
+      const currentAddress = walletAddress.toLowerCase();
+      const storedAddress = store.walletAddress.toLowerCase();
+
+      if (currentAddress !== storedAddress) {
+        disconnect();
+        store.logout();
+      }
+    }
+  }, [isHydrated, isConnected, walletAddress, store.walletAddress]);
+
+  // User is fully authenticated if:
+  // 1. Store has been hydrated
+  // 2. Wallet is connected
+  // 3. Store has wallet address (verified with backend)
+  const isAuthenticated = isHydrated && isConnected && !!store.walletAddress;
+
   return {
-    ...auth,
+    // Auth state
+    isAuthenticated,
     isHydrated,
-    // Ensure isAuthenticated is false until hydration is complete
-    isAuthenticated: isHydrated && auth.isAuthenticated
+    walletAddress: store.walletAddress,
+    isCompany: store.isCompany,
+    isEmployee: store.isEmployee,
+    isAuditor: store.isAuditor,
+
+    // UI state
+    loading: store.loading,
+    error: store.error,
+
+    // Actions
+    logout: () => {
+      disconnect();
+      store.logout();
+    },
   };
 };
 
-// Simplified wallet verification hook
+/**
+ * Hook for verifying wallet with backend
+ */
 export const useVerifyWallet = () => {
   const [isVerifying, setIsVerifying] = useState(false);
   const { setLoading, setError, setAuth } = useAuthStore();
@@ -31,30 +80,23 @@ export const useVerifyWallet = () => {
   const verify = useCallback(
     async (address: string) => {
       if (!address) {
-        console.log("⚠️ No wallet address provided");
         return { success: false, error: "No wallet address" };
       }
 
-      // Normalize address to lowercase
       const normalizedAddress = address.toLowerCase();
-
-      console.log("🔐 Verifying wallet:", normalizedAddress);
       setIsVerifying(true);
       setLoading(true);
-      setError(null); // Clear previous errors
+      setError(null);
 
       try {
-        console.log("📤 Sending verify request to backend...");
         const response: AuthResponse = await authApi.verifyWallet(normalizedAddress);
-        console.log("📥 Backend response:", response);
 
         if (response.success && response.data) {
-          console.log("✅ Wallet verified successfully!");
           const { walletAddress, isCompany, isEmployee, isAuditor, token } = response.data;
 
           // Store JWT token
-          if (token && typeof window !== 'undefined') {
-            localStorage.setItem("authToken", token);
+          if (token && typeof window !== "undefined") {
+            localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
           }
 
           // Update auth store
@@ -63,13 +105,11 @@ export const useVerifyWallet = () => {
           return { success: true };
         } else {
           const errorMsg = response.error || "Failed to verify wallet";
-          console.error("❌ Verification failed:", errorMsg);
           setError(errorMsg);
           return { success: false, error: errorMsg };
         }
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : "Verification failed";
-        console.error("❌ Verification error:", errorMsg, error);
         setError(errorMsg);
         return { success: false, error: errorMsg };
       } finally {
@@ -83,7 +123,9 @@ export const useVerifyWallet = () => {
   return { verify, isVerifying };
 };
 
-// Hook for fetching employee streams
+/**
+ * Hook for fetching employee streams
+ */
 export const useEmployeeStreams = (walletAddress: string | null) => {
   const [streams, setStreams] = useState<Stream[]>([]);
   const [loading, setLoading] = useState(false);
@@ -117,7 +159,9 @@ export const useEmployeeStreams = (walletAddress: string | null) => {
   return { streams, loading, error, refetch: fetchStreams };
 };
 
-// Hook for fetching company streams
+/**
+ * Hook for fetching company streams
+ */
 export const useCompanyStreams = (walletAddress: string | null) => {
   const [streams, setStreams] = useState<Stream[]>([]);
   const [loading, setLoading] = useState(false);
@@ -151,7 +195,9 @@ export const useCompanyStreams = (walletAddress: string | null) => {
   return { streams, loading, error, refetch: fetchStreams };
 };
 
-// Hook for fetching employee milestones
+/**
+ * Hook for fetching employee milestones
+ */
 export const useEmployeeMilestones = (walletAddress: string | null) => {
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [loading, setLoading] = useState(false);
@@ -185,7 +231,9 @@ export const useEmployeeMilestones = (walletAddress: string | null) => {
   return { milestones, loading, error, refetch: fetchMilestones };
 };
 
-// Hook for fetching pending milestones (auditor)
+/**
+ * Hook for fetching pending milestones (auditor)
+ */
 export const usePendingMilestones = () => {
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [loading, setLoading] = useState(false);

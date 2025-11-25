@@ -1,24 +1,24 @@
 "use client";
 
-import React, { ReactNode } from "react";
 import { WagmiProvider, createConfig, http } from "wagmi";
 import { sepolia } from "wagmi/chains";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { injected } from "wagmi/connectors";
 
-// Wagmi configuration for Sepolia testnet
-const config = createConfig({
+import { BLOCKCHAIN_CONFIG } from "./constants";
+
+// Configure wagmi with Sepolia testnet
+export const config = createConfig({
   chains: [sepolia],
   connectors: [
     injected(),
   ],
   transports: {
-    [sepolia.id]: http(process.env.NEXT_PUBLIC_RPC_URL),
+    [sepolia.id]: http(BLOCKCHAIN_CONFIG.RPC_URL),
   },
   ssr: true,
 });
 
-// Create QueryClient with default options
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -28,7 +28,7 @@ const queryClient = new QueryClient({
   },
 });
 
-export function AppWalletProvider({ children }: { children: ReactNode }) {
+export function AppWalletProvider({ children }: { children: React.ReactNode }) {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
@@ -37,5 +37,3 @@ export function AppWalletProvider({ children }: { children: ReactNode }) {
     </WagmiProvider>
   );
 }
-
-export { config };

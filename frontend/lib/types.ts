@@ -1,7 +1,7 @@
 // Authentication types
 export interface AuthResponse {
   success: boolean;
-  data: {
+  data?: {
     walletAddress: string;
     isCompany: boolean;
     isEmployee: boolean;
@@ -9,16 +9,7 @@ export interface AuthResponse {
     isNewUser?: boolean;
     token?: string;
   };
-}
-
-export interface AuthState {
-  isAuthenticated: boolean;
-  isCompany: boolean;
-  isEmployee: boolean;
-  isAuditor: boolean;
-  walletAddress: string | null;
-  loading: boolean;
-  error: string | null;
+  error?: string;
 }
 
 // Stream types
