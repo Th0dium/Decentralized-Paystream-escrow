@@ -7,6 +7,7 @@ export interface AuthResponse {
     isEmployee: boolean;
     isAuditor: boolean;
     isNewUser?: boolean;
+    token?: string;
   };
 }
 

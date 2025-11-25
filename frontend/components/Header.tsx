@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { useAuth } from "@/lib/hooks";
 import { useRouter } from "next/navigation";
+import { useDisconnect } from "wagmi";
 
 export default function Header() {
   const router = useRouter();
   const { isAuthenticated, walletAddress, logout } = useAuth();
+  const { disconnect } = useDisconnect();
 
   const handleLogout = () => {
+    disconnect();
     logout();
     router.push("/login");
   };

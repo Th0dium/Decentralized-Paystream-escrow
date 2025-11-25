@@ -1,11 +1,7 @@
-import type { Metadata } from "next";
-import "./globals.css";
+"use client";
 
-export const metadata: Metadata = {
-  title: "Paystream - Salary Streaming & Escrow",
-  description:
-    "Decentralized salary streaming and milestone-based escrow system",
-};
+import "./globals.css";
+import { AppWalletProvider } from "@/lib/wallet-provider";
 
 export default function RootLayout({
   children,
@@ -14,7 +10,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <AppWalletProvider>{children}</AppWalletProvider>
+      </body>
     </html>
   );
 }

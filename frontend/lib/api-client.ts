@@ -9,6 +9,16 @@ const apiClient = axios.create({
   timeout: API_TIMEOUT,
 });
 
+apiClient.interceptors.request.use((config) => {
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("authToken");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  }
+  return config;
+});
+
 export const authApi = {
   verifyWallet: async (address: string): Promise<AuthResponse> => {
     // In a real app, you'd send a signature to be verified
