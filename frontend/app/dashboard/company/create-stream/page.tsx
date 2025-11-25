@@ -1,13 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAccount } from "wagmi";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { TokenSelector } from "@/components/TokenSelector";
-import { approveTokens, createStream, checkNetwork } from "@/lib/contract-interaction";
+import { approveTokens, createStream } from "@/lib/contract-interaction";
 import { Token, WHITELISTED_TOKENS } from "@/lib/tokens";
+import { Address } from "viem";
 
 export default function CreateStreamPage() {
+  const { address: account, chainId, isConnected } = useAccount();
+
   const [formData, setFormData] = useState({
     employeeAddress: "",
     totalAmount: "",
@@ -20,6 +24,17 @@ export default function CreateStreamPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [transactionHash, setTransactionHash] = useState<string | null>(null);
+  
+  const expectedChainId = parseInt(process.env.NEXT_PUBLIC_CHAIN_ID || "11155111");
+  const isCorrectNetwork = isConnected && chainId === expectedChainId;
+
+  useEffect(() => {
+    if (isConnected && !isCorrectNetwork) {
+      setError(`Please switch to the correct network (chain ID: ${expectedChainId})`);
+    } else {
+      setError(null);
+    }
+  }, [isConnected, isCorrectNetwork, expectedChainId]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -45,6 +60,11 @@ export default function CreateStreamPage() {
     setSuccess(null);
     setTransactionHash(null);
 
+    if (!isCorrectNetwork || !account) {
+        setError("Please connect your wallet and ensure you are on the correct network.");
+        return;
+    }
+
     // Validation
     if (!formData.employeeAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
       setError("Invalid Employee Ethereum address");
@@ -69,28 +89,20 @@ export default function CreateStreamPage() {
     setIsSubmitting(true);
 
     try {
-      const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
-      const chainId = parseInt(process.env.NEXT_PUBLIC_CHAIN_ID || "11155111");
-
+      const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS as Address;
       if (!contractAddress) {
         throw new Error("Contract address not configured");
       }
 
       console.log("\n🚀 Starting stream creation process...");
-
-      // Check network
-      console.log("🔍 Checking network...");
-      const correctNetwork = await checkNetwork(chainId);
-      if (!correctNetwork) {
-        throw new Error(`Please switch to the correct network (chain ID: ${chainId})`);
-      }
-
+      
       // Step 1: Approve tokens
       console.log("\n📝 Step 1: Approving tokens...");
       const approvalHash = await approveTokens(
-        selectedToken.address,
+        selectedToken.address as Address,
         contractAddress,
-        formData.totalAmount
+        formData.totalAmount,
+        selectedToken.decimals
       );
       console.log(`✅ Approval hash: ${approvalHash}`);
 
@@ -98,11 +110,12 @@ export default function CreateStreamPage() {
       console.log("\n📝 Step 2: Creating stream...");
       const result = await createStream(
         contractAddress,
-        formData.employeeAddress,
-        selectedToken.address,
+        formData.employeeAddress as Address,
+        selectedToken.address as Address,
         formData.totalAmount,
         formData.duration,
-        formData.escrowPercentage
+        formData.escrowPercentage,
+        selectedToken.decimals
       );
 
       console.log(`\n✅ Stream created successfully!`);
@@ -133,6 +146,19 @@ export default function CreateStreamPage() {
     formData.totalAmount &&
     (parseFloat(formData.totalAmount) * formData.escrowPercentage) / 100;
 
+  if (!isConnected) {
+    return (
+        <div className="max-w-2xl">
+            <h1 className="text-3xl font-bold mb-8">Create Salary Stream</h1>
+            <Card>
+                <div className="p-8 text-center">
+                    <p className="text-gray-600">Please connect your wallet to create a stream.</p>
+                </div>
+            </Card>
+        </div>
+    );
+  }
+
   return (
     <div className="max-w-2xl">
       <h1 className="text-3xl font-bold mb-8">Create Salary Stream</h1>
@@ -155,148 +181,151 @@ export default function CreateStreamPage() {
               )}
             </div>
           )}
-
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Employee Wallet Address
-            </label>
-            <input
-              type="text"
-              name="employeeAddress"
-              value={formData.employeeAddress}
-              onChange={handleChange}
-              placeholder="0x..."
-              className="input-base"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Must be a valid Ethereum address
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Token (ERC20)</label>
-            {showTokenSelector ? (
-              <TokenSelector
-                value={selectedToken.address}
-                onChange={handleTokenChange}
-              />
-            ) : (
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">{selectedToken.logo || "💰"}</span>
-                  <span className="font-semibold">{selectedToken.symbol} - {selectedToken.name}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowTokenSelector(true)}
-                  className="text-sm font-medium text-blue-600 hover:text-blue-800"
-                >
-                  Change
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Total Amount (in {selectedToken.symbol})
-            </label>
-            <input
-              type="number"
-              name="totalAmount"
-              value={formData.totalAmount}
-              onChange={handleChange}
-              placeholder="0.0"
-              step="0.001"
-              className="input-base"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Enter the total amount to fund this stream
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Duration (Days)
-            </label>
-            <input
-              type="number"
-              name="duration"
-              value={formData.duration}
-              onChange={handleChange}
-              min="1"
-              max="365"
-              className="input-base"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Stream duration: {durationInSeconds.toLocaleString()} seconds
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Escrow Percentage (%)
-            </label>
-            <div className="flex items-center gap-4">
-              <input
-                type="range"
-                name="escrowPercentage"
-                value={formData.escrowPercentage}
+          
+          <fieldset disabled={!isCorrectNetwork || isSubmitting}>
+            <div>
+                <label className="block text-sm font-medium mb-2">
+                Employee Wallet Address
+                </label>
+                <input
+                type="text"
+                name="employeeAddress"
+                value={formData.employeeAddress}
                 onChange={handleChange}
-                min="0"
-                max="100"
-                className="flex-1"
-              />
-              <span className="text-lg font-semibold w-12">
-                {formData.escrowPercentage}%
-              </span>
+                placeholder="0x..."
+                className="input-base"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                Must be a valid Ethereum address
+                </p>
             </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Percentage of withdrawn funds locked in escrow for milestones
-            </p>
-          </div>
 
-          {formData.totalAmount && (
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-              <h3 className="font-semibold mb-3">Stream Summary</h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-gray-600">Total Amount</p>
-                  <p className="font-semibold">
-                    {parseFloat(formData.totalAmount).toFixed(6)} {selectedToken.symbol}
-                  </p>
+            <div>
+                <label className="block text-sm font-medium mb-2">Token (ERC20)</label>
+                {showTokenSelector ? (
+                <TokenSelector
+                    value={selectedToken.address}
+                    onChange={handleTokenChange}
+                />
+                ) : (
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                    <div className="flex items-center gap-2">
+                    <span className="text-xl">{selectedToken.logo || "💰"}</span>
+                    <span className="font-semibold">{selectedToken.symbol} - {selectedToken.name}</span>
+                    </div>
+                    <button
+                    type="button"
+                    onClick={() => setShowTokenSelector(true)}
+                    className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                    >
+                    Change
+                    </button>
                 </div>
-                <div>
-                  <p className="text-gray-600">Duration</p>
-                  <p className="font-semibold">{formData.duration} days</p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Escrowed Amount</p>
-                  <p className="font-semibold text-purple-600">
-                    {(escrowAmount || 0).toFixed(6)} {selectedToken.symbol}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Payout Amount</p>
-                  <p className="font-semibold">
-                    {(
-                      parseFloat(formData.totalAmount) - (escrowAmount || 0)
-                    ).toFixed(6)}{" "}
-                    {selectedToken.symbol}
-                  </p>
-                </div>
-              </div>
+                )}
             </div>
-          )}
 
-          <Button
-            type="submit"
-            variant="primary"
-            loading={isSubmitting}
-            className="w-full"
-          >
-            Create Stream
-          </Button>
+            <div>
+                <label className="block text-sm font-medium mb-2">
+                Total Amount (in {selectedToken.symbol})
+                </label>
+                <input
+                type="number"
+                name="totalAmount"
+                value={formData.totalAmount}
+                onChange={handleChange}
+                placeholder="0.0"
+                step="0.001"
+                className="input-base"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                Enter the total amount to fund this stream
+                </p>
+            </div>
+
+            <div>
+                <label className="block text-sm font-medium mb-2">
+                Duration (Days)
+                </label>
+                <input
+                type="number"
+                name="duration"
+                value={formData.duration}
+                onChange={handleChange}
+                min="1"
+                max="365"
+                className="input-base"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                Stream duration: {durationInSeconds.toLocaleString()} seconds
+                </p>
+            </div>
+
+            <div>
+                <label className="block text-sm font-medium mb-2">
+                Escrow Percentage (%)
+                </label>
+                <div className="flex items-center gap-4">
+                <input
+                    type="range"
+                    name="escrowPercentage"
+                    value={formData.escrowPercentage}
+                    onChange={handleChange}
+                    min="0"
+                    max="100"
+                    className="flex-1"
+                />
+                <span className="text-lg font-semibold w-12">
+                    {formData.escrowPercentage}%
+                </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                Percentage of withdrawn funds locked in escrow for milestones
+                </p>
+            </div>
+
+            {formData.totalAmount && (
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <h3 className="font-semibold mb-3">Stream Summary</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                    <p className="text-gray-600">Total Amount</p>
+                    <p className="font-semibold">
+                        {parseFloat(formData.totalAmount).toFixed(6)} {selectedToken.symbol}
+                    </p>
+                    </div>
+                    <div>
+                    <p className="text-gray-600">Duration</p>
+                    <p className="font-semibold">{formData.duration} days</p>
+                    </div>
+                    <div>
+                    <p className="text-gray-600">Escrowed Amount</p>
+                    <p className="font-semibold text-purple-600">
+                        {(escrowAmount || 0).toFixed(6)} {selectedToken.symbol}
+                    </p>
+                    </div>
+                    <div>
+                    <p className="text-gray-600">Payout Amount</p>
+                    <p className="font-semibold">
+                        {( 
+                        parseFloat(formData.totalAmount) - (escrowAmount || 0)
+                        ).toFixed(6)}{" "}
+                        {selectedToken.symbol}
+                    </p>
+                    </div>
+                </div>
+                </div>
+            )}
+
+            <Button
+                type="submit"
+                variant="primary"
+                loading={isSubmitting}
+                className="w-full"
+                disabled={!isCorrectNetwork || isSubmitting}
+            >
+                Create Stream
+            </Button>
+          </fieldset>
         </form>
       </Card>
     </div>

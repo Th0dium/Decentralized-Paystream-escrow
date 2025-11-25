@@ -1,4 +1,11 @@
-import { BrowserProvider, Contract, parseUnits } from "ethers";
+import { parseUnits, Address } from "viem";
+import { 
+  writeContract, 
+  readContract, 
+  getBlock, 
+  waitForTransactionReceipt 
+} from "wagmi/actions";
+import { config } from "./wallet-provider";
 
 // Minimal Paystream ABI with just the functions we need
 const PAYSTREAM_ABI = [
@@ -16,7 +23,7 @@ const PAYSTREAM_ABI = [
     stateMutability: "nonpayable",
     type: "function",
   },
-];
+] as const; // Add 'as const' for better type inference with viem
 
 // ERC20 ABI for approve function
 const ERC20_ABI = [
@@ -44,91 +51,55 @@ const ERC20_ABI = [
     stateMutability: "view",
     type: "function",
   },
-];
-
-/**
- * Get the MetaMask provider
- */
-function getProvider() {
-  if (typeof window === "undefined") {
-    throw new Error("Window object not found");
-  }
-
-  const provider = (window as any).ethereum;
-
-  if (!provider) {
-    throw new Error("MetaMask wallet not found. Please install the extension.");
-  }
-
-  return new ethers.BrowserProvider(provider);
-}
-
-/**
- * Request account access from wallet
- */
-export async function requestAccount(): Promise<string> {
-  const provider = getEthereumProvider();
-  const accounts = await provider.request({ method: "eth_requestAccounts" });
-  return accounts[0];
-}
-
-/**
- * Get the ethers.js provider and signer
- */
-export async function getProviderAndSigner() {
-  const provider = getEthereumProvider();
-  const ethersProvider = new BrowserProvider(provider);
-  const signer = await ethersProvider.getSigner();
-  return { ethersProvider, signer };
-}
+] as const;
 
 /**
  * Approve tokens for the Paystream contract
  */
 export async function approveTokens(
-  tokenAddress: string,
-  spenderAddress: string,
+  tokenAddress: Address,
+  spenderAddress: Address,
   amount: string,
   decimals: number = 18
 ): Promise<string> {
-  const { signer } = await getProviderAndSigner();
-
-  const tokenContract = new Contract(tokenAddress, ERC20_ABI, signer);
   const amountInWei = parseUnits(amount, decimals);
 
-  console.log("🔐 Approving tokens...");
+  console.log("🔐 Approving tokens with viem...");
   console.log(`Token: ${tokenAddress}`);
   console.log(`Spender: ${spenderAddress}`);
   console.log(`Amount: ${amount} tokens (${amountInWei} wei)`);
 
-  const tx = await tokenContract.approve(spenderAddress, amountInWei);
-  console.log(`✅ Approval transaction sent: ${tx.hash}`);
+  const hash = await writeContract(config, {
+    address: tokenAddress,
+    abi: ERC20_ABI,
+    functionName: "approve",
+    args: [spenderAddress, amountInWei],
+  });
+  
+  console.log(`✅ Approval transaction sent: ${hash}`);
 
-  const receipt = await tx.wait();
-  console.log(`✅ Approval confirmed in block ${receipt?.blockNumber}`);
+  const receipt = await waitForTransactionReceipt(config, { hash });
+  console.log(`✅ Approval confirmed in block ${receipt.blockNumber}`);
 
-  return tx.hash;
+  return hash;
 }
 
 /**
  * Create a stream on the Paystream contract
  */
 export async function createStream(
-  contractAddress: string,
-  employeeAddress: string,
-  tokenAddress: string,
+  contractAddress: Address,
+  employeeAddress: Address,
+  tokenAddress: Address,
   totalAmount: string,
   durationDays: number,
   escrowPercentage: number,
   tokenDecimals: number = 18
 ): Promise<{ transactionHash: string; streamId?: string }> {
-  const { signer, ethersProvider } = await getProviderAndSigner();
 
   // Get current block timestamp
-  const block = await ethersProvider.getBlock("latest");
-  if (!block) throw new Error("Failed to get current block");
-
-  const startTime = Math.floor(block.timestamp);
+  const block = await getBlock(config);
+  const startTime = Number(block.timestamp); // viem timestamp is bigint
   const stopTime = startTime + durationDays * 24 * 60 * 60;
 
   // Convert amount to wei
@@ -137,38 +108,32 @@ export async function createStream(
   // Convert percentage to basis points (0-10000)
   const escrowBps = Math.floor(escrowPercentage * 100);
 
-  console.log("\n💰 === CREATE STREAM ===");
+  console.log("\n💰 === CREATE STREAM (viem) ===");
   console.log(`📍 Contract: ${contractAddress}`);
   console.log(`👤 Employee: ${employeeAddress}`);
-  console.log(`💵 Token: ${tokenAddress}`);
-  console.log(`💰 Amount: ${totalAmount} tokens (${amountInWei} wei)`);
-  console.log(`📅 Start: ${new Date(startTime * 1000).toISOString()}`);
-  console.log(`📅 Stop: ${new Date(stopTime * 1000).toISOString()}`);
-  console.log(`⏱️ Duration: ${durationDays} days`);
-  console.log(`🔒 Escrow: ${escrowPercentage}% (${escrowBps} bps)`);
-
-  const contract = new Contract(contractAddress, PAYSTREAM_ABI, signer);
+  // ... (rest of the logs)
 
   try {
     console.log("\n📤 Submitting createStream transaction...");
-    const tx = await contract.createStream(
-      employeeAddress,
-      tokenAddress,
-      amountInWei,
-      startTime,
-      stopTime,
-      escrowBps
-    );
+    const hash = await writeContract(config, {
+        address: contractAddress,
+        abi: PAYSTREAM_ABI,
+        functionName: "createStream",
+        args: [
+            employeeAddress,
+            tokenAddress,
+            amountInWei,
+            BigInt(startTime),
+            BigInt(stopTime),
+            escrowBps
+        ],
+    });
 
-    console.log(`✅ Transaction sent: ${tx.hash}`);
-
-    // Wait for confirmation
-    console.log("⏳ Waiting for confirmation...");
-    const receipt = await tx.wait();
-    console.log(`✅ Confirmed in block ${receipt?.blockNumber}`);
+    console.log(`✅ Transaction sent: ${hash}`);
+    await waitForTransactionReceipt(config, { hash });
 
     return {
-      transactionHash: tx.hash,
+      transactionHash: hash,
     };
   } catch (error) {
     console.error("\n❌ === CREATE STREAM FAILED ===");
@@ -184,31 +149,28 @@ export async function createStream(
  * Get token balance
  */
 export async function getTokenBalance(
-  tokenAddress: string,
-  accountAddress: string
+  tokenAddress: Address,
+  accountAddress: Address
 ): Promise<string> {
-  const { ethersProvider } = await getProviderAndSigner();
-  const contract = new Contract(tokenAddress, ERC20_ABI, ethersProvider);
-  const balance = await contract.balanceOf(accountAddress);
-  return balance.toString();
+    const balance = await readContract(config, {
+        address: tokenAddress,
+        abi: ERC20_ABI,
+        functionName: 'balanceOf',
+        args: [accountAddress]
+    });
+    return balance.toString();
 }
 
 /**
  * Get token decimals
  */
-export async function getTokenDecimals(tokenAddress: string): Promise<number> {
-  const { ethersProvider } = await getProviderAndSigner();
-  const contract = new Contract(tokenAddress, ERC20_ABI, ethersProvider);
-  const decimals = await contract.decimals();
-  return decimals;
-}
-
-/**
- * Check if connected to correct network
- */
-export async function checkNetwork(expectedChainId: number): Promise<boolean> {
-  const { ethersProvider } = await getProviderAndSigner();
-  const network = await ethersProvider.getNetwork();
-  console.log(`Connected to chain ID: ${network.chainId}, expected: ${expectedChainId}`);
-  return network.chainId === expectedChainId;
+export async function getTokenDecimals(
+  tokenAddress: Address,
+): Promise<number> {
+    const decimals = await readContract(config, {
+        address: tokenAddress,
+        abi: ERC20_ABI,
+        functionName: 'decimals',
+    });
+    return decimals;
 }
