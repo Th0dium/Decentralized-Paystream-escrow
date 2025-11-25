@@ -285,31 +285,42 @@ export default function CreateStreamPage() {
 
             {formData.totalAmount && (
                 <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                <h3 className="font-semibold mb-3">Stream Summary</h3>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                    <p className="text-gray-600">Total Amount</p>
-                    <p className="font-semibold">
+                <div className="mb-3">
+                    <h3 className="font-semibold">Stream Summary</h3>
+                    <p className="text-xs text-gray-600 mt-1">
+                    Breakdown of your {parseFloat(formData.totalAmount).toFixed(6)} {selectedToken.symbol} payment
+                    </p>
+                </div>
+                <div className="space-y-3 text-sm">
+                    <div className="flex justify-between items-center pb-3 border-b border-blue-200">
+                    <span className="text-gray-700">
+                        Total Amount to Employee
+                    </span>
+                    <span className="font-bold text-lg">
                         {parseFloat(formData.totalAmount).toFixed(6)} {selectedToken.symbol}
-                    </p>
+                    </span>
                     </div>
+
                     <div>
-                    <p className="text-gray-600">Duration</p>
-                    <p className="font-semibold">{formData.duration} days</p>
+                    <div className="flex justify-between mb-2">
+                        <span className="text-gray-600">Immediately Unlocked</span>
+                        <span className="font-semibold">
+                        {(
+                            parseFloat(formData.totalAmount) - (escrowAmount || 0)
+                        ).toFixed(6)} {selectedToken.symbol}
+                        </span>
                     </div>
-                    <div>
-                    <p className="text-gray-600">Escrowed Amount</p>
-                    <p className="font-semibold text-purple-600">
+                    <div className="flex justify-between">
+                        <span className="text-gray-600">Locked in Escrow ({formData.escrowPercentage}%)</span>
+                        <span className="font-semibold text-purple-600">
                         {(escrowAmount || 0).toFixed(6)} {selectedToken.symbol}
-                    </p>
+                        </span>
                     </div>
-                    <div>
-                    <p className="text-gray-600">Payout Amount</p>
-                    <p className="font-semibold">
-                        {( 
-                        parseFloat(formData.totalAmount) - (escrowAmount || 0)
-                        ).toFixed(6)}{" "}
-                        {selectedToken.symbol}
+                    </div>
+
+                    <div className="pt-2 border-t border-blue-200">
+                    <p className="text-xs text-gray-600 text-center">
+                        ℹ️ Includes platform fees and gas costs calculated at transaction time
                     </p>
                     </div>
                 </div>
