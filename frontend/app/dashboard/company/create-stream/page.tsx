@@ -5,7 +5,7 @@ import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { TokenSelector } from "@/components/TokenSelector";
 import { approveTokens, createStream, checkNetwork } from "@/lib/contract-interaction";
-import { Token } from "@/lib/tokens";
+import { Token, WHITELISTED_TOKENS } from "@/lib/tokens";
 
 export default function CreateStreamPage() {
   const [formData, setFormData] = useState({
@@ -14,7 +14,8 @@ export default function CreateStreamPage() {
     duration: 30, // days
     escrowPercentage: 30,
   });
-  const [selectedToken, setSelectedToken] = useState<Token | null>(null);
+  const [selectedToken, setSelectedToken] = useState<Token>(WHITELISTED_TOKENS[0]);
+  const [showTokenSelector, setShowTokenSelector] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -33,6 +34,11 @@ export default function CreateStreamPage() {
     }));
   };
 
+  const handleTokenChange = (token: Token) => {
+    setSelectedToken(token);
+    setShowTokenSelector(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -42,11 +48,6 @@ export default function CreateStreamPage() {
     // Validation
     if (!formData.employeeAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
       setError("Invalid Employee Ethereum address");
-      return;
-    }
-
-    if (!selectedToken) {
-      setError("Please select a token");
       return;
     }
 
@@ -117,7 +118,7 @@ export default function CreateStreamPage() {
         duration: 30,
         escrowPercentage: 30,
       });
-      setSelectedToken(null);
+      setSelectedToken(WHITELISTED_TOKENS[0]); // Reset to default
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Failed to create stream";
       console.error("❌ Error creating stream:", errorMsg);
@@ -172,15 +173,33 @@ export default function CreateStreamPage() {
             </p>
           </div>
 
-          <TokenSelector
-            value={selectedToken?.address || ""}
-            onChange={setSelectedToken}
-            label="Token (ERC20)"
-          />
+          <div>
+            <label className="block text-sm font-medium mb-2">Token (ERC20)</label>
+            {showTokenSelector ? (
+              <TokenSelector
+                value={selectedToken.address}
+                onChange={handleTokenChange}
+              />
+            ) : (
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">{selectedToken.logo || "💰"}</span>
+                  <span className="font-semibold">{selectedToken.symbol} - {selectedToken.name}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowTokenSelector(true)}
+                  className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                >
+                  Change
+                </button>
+              </div>
+            )}
+          </div>
 
           <div>
             <label className="block text-sm font-medium mb-2">
-              Total Amount (Tokens)
+              Total Amount (in {selectedToken.symbol})
             </label>
             <input
               type="number"
@@ -244,7 +263,7 @@ export default function CreateStreamPage() {
                 <div>
                   <p className="text-gray-600">Total Amount</p>
                   <p className="font-semibold">
-                    {parseFloat(formData.totalAmount).toFixed(6)} tokens
+                    {parseFloat(formData.totalAmount).toFixed(6)} {selectedToken.symbol}
                   </p>
                 </div>
                 <div>
@@ -254,7 +273,7 @@ export default function CreateStreamPage() {
                 <div>
                   <p className="text-gray-600">Escrowed Amount</p>
                   <p className="font-semibold text-purple-600">
-                    {(escrowAmount || 0).toFixed(6)} tokens
+                    {(escrowAmount || 0).toFixed(6)} {selectedToken.symbol}
                   </p>
                 </div>
                 <div>
@@ -263,7 +282,7 @@ export default function CreateStreamPage() {
                     {(
                       parseFloat(formData.totalAmount) - (escrowAmount || 0)
                     ).toFixed(6)}{" "}
-                    tokens
+                    {selectedToken.symbol}
                   </p>
                 </div>
               </div>

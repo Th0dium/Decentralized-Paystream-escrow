@@ -61,10 +61,3 @@ export function getTokenBySymbol(symbol: string): Token | undefined {
 export function formatToken(token: Token): string {
   return `${token.logo || "💰"} ${token.symbol}`;
 }
-
-/**
- * Format token display
- */
-export function formatToken(token: Token): string {
-  return `${token.logo || "💰"} ${token.symbol}`;
-}

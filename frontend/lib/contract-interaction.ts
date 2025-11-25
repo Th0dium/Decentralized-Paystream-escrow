@@ -47,20 +47,20 @@ const ERC20_ABI = [
 ];
 
 /**
- * Get the Phantom/wallet provider
+ * Get the MetaMask provider
  */
-function getEthereumProvider() {
-  if (typeof window === "undefined") return null;
-
-  const provider =
-    window.phantom?.ethereum ||
-    (window.ethereum as any);
-
-  if (!provider) {
-    throw new Error("Phantom or MetaMask wallet not found");
+function getProvider() {
+  if (typeof window === "undefined") {
+    throw new Error("Window object not found");
   }
 
-  return provider;
+  const provider = (window as any).ethereum;
+
+  if (!provider) {
+    throw new Error("MetaMask wallet not found. Please install the extension.");
+  }
+
+  return new ethers.BrowserProvider(provider);
 }
 
 /**
