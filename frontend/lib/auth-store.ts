@@ -1,32 +1,47 @@
 import { create } from "zustand";
-import { AuthState } from "./types";
 
-interface AuthStore extends AuthState {
+import { STORAGE_KEYS } from "./constants";
+
+interface AuthStore {
+  // Auth data
+  walletAddress: string | null;
+  isCompany: boolean;
+  isEmployee: boolean;
+  isAuditor: boolean;
+
+  // UI state
+  loading: boolean;
+  error: string | null;
+
+  // Actions
   setAuth: (walletAddress: string, isCompany: boolean, isEmployee: boolean, isAuditor: boolean) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   logout: () => void;
-  initFromStorage: () => void;
+  hydrate: () => void;
 }
 
 export const useAuthStore = create<AuthStore>((set) => ({
-  isAuthenticated: false,
+  // Initial state
+  walletAddress: null,
   isCompany: false,
   isEmployee: false,
   isAuditor: false,
-  walletAddress: null,
   loading: false,
   error: null,
 
+  // Set authentication data
   setAuth: (walletAddress, isCompany, isEmployee, isAuditor) => {
+    // Save to localStorage
     if (typeof window !== "undefined") {
-      localStorage.setItem("walletAddress", walletAddress);
-      localStorage.setItem("isCompany", String(isCompany));
-      localStorage.setItem("isEmployee", String(isEmployee));
-      localStorage.setItem("isAuditor", String(isAuditor));
+      localStorage.setItem(STORAGE_KEYS.WALLET_ADDRESS, walletAddress);
+      localStorage.setItem(STORAGE_KEYS.IS_COMPANY, String(isCompany));
+      localStorage.setItem(STORAGE_KEYS.IS_EMPLOYEE, String(isEmployee));
+      localStorage.setItem(STORAGE_KEYS.IS_AUDITOR, String(isAuditor));
     }
+
+    // Update store
     set({
-      isAuthenticated: true,
       walletAddress,
       isCompany,
       isEmployee,
@@ -39,16 +54,17 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
   setError: (error) => set({ error }),
 
+  // Clear all auth data
   logout: () => {
+    // Clear localStorage
     if (typeof window !== "undefined") {
-      localStorage.removeItem("walletAddress");
-      localStorage.removeItem("isCompany");
-      localStorage.removeItem("isEmployee");
-      localStorage.removeItem("isAuditor");
-      localStorage.removeItem("authToken");
+      Object.values(STORAGE_KEYS).forEach((key) => {
+        localStorage.removeItem(key);
+      });
     }
+
+    // Reset store
     set({
-      isAuthenticated: false,
       walletAddress: null,
       isCompany: false,
       isEmployee: false,
@@ -57,22 +73,22 @@ export const useAuthStore = create<AuthStore>((set) => ({
     });
   },
 
-  initFromStorage: () => {
-    if (typeof window !== "undefined") {
-      const walletAddress = localStorage.getItem("walletAddress");
-      const isCompany = localStorage.getItem("isCompany") === 'true';
-      const isEmployee = localStorage.getItem("isEmployee") === 'true';
-      const isAuditor = localStorage.getItem("isAuditor") === 'true';
+  // Hydrate from localStorage on app start
+  hydrate: () => {
+    if (typeof window === "undefined") return;
 
-      if (walletAddress) {
-        set({
-          isAuthenticated: true,
-          walletAddress,
-          isCompany,
-          isEmployee,
-          isAuditor,
-        });
-      }
+    const walletAddress = localStorage.getItem(STORAGE_KEYS.WALLET_ADDRESS);
+    const isCompany = localStorage.getItem(STORAGE_KEYS.IS_COMPANY) === "true";
+    const isEmployee = localStorage.getItem(STORAGE_KEYS.IS_EMPLOYEE) === "true";
+    const isAuditor = localStorage.getItem(STORAGE_KEYS.IS_AUDITOR) === "true";
+
+    if (walletAddress) {
+      set({
+        walletAddress,
+        isCompany,
+        isEmployee,
+        isAuditor,
+      });
     }
   },
 }));
