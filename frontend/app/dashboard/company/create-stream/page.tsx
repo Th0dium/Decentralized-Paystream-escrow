@@ -176,7 +176,6 @@ export default function CreateStreamPage() {
             value={selectedToken?.address || ""}
             onChange={setSelectedToken}
             label="Token (ERC20)"
-            allowCustom={true}
           />
 
           <div>

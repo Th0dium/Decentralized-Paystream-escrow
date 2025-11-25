@@ -91,6 +91,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
     bool public newPaymentsPaused;
     uint16 public platformFeeBps;
     address public feeRecipient;
+    mapping(address => bool) public isTokenWhitelisted;
 
     // Validation bounds
     uint256 public constant MIN_PAYMENT_DURATION = 1 days;
@@ -104,6 +105,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
     event PlatformFeeUpdated(uint16 newFeeBps);
     event FeeRecipientUpdated(address indexed newRecipient);
     event NewPaymentsCreationPaused(bool status);
+    event TokenWhitelistUpdated(address indexed token, bool isWhitelisted);
 
     // Payment events
     event PaymentCreated(
@@ -172,6 +174,21 @@ contract Paystream is ReentrancyGuard, AccessControl {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         platformFeeBps = 5; // Default 0.05%
         feeRecipient = msg.sender;
+
+        // Whitelist popular stablecoins on Ethereum Mainnet by default
+        // On other networks, these addresses must be updated.
+        // USDC: 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
+        isTokenWhitelisted[
+            address(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48)
+        ] = true;
+        // USDT: 0xdAC17F958D2ee523a2206206994597C13D831ec7
+        isTokenWhitelisted[
+            address(0xdAC17F958D2ee523a2206206994597C13D831ec7)
+        ] = true;
+        // DAI: 0x6B175474E89094C44Da98b954EedeAC495271d0F
+        isTokenWhitelisted[
+            address(0x6B175474E89094C44Da98b954EedeAC495271d0F)
+        ] = true;
     }
 
     // ============ Admin Functions ============
@@ -199,6 +216,20 @@ contract Paystream is ReentrancyGuard, AccessControl {
         emit FeeRecipientUpdated(newRecipient);
     }
 
+    /**
+     * @notice Add or remove a token from the whitelist (admin only)
+     * @param token The ERC20 token address
+     * @param whitelisted The desired whitelist status
+     */
+    function updateTokenWhitelist(
+        address token,
+        bool whitelisted
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(token != address(0), "invalid token address");
+        isTokenWhitelisted[token] = whitelisted;
+        emit TokenWhitelistUpdated(token, whitelisted);
+    }
+
     // ============ Payment Protocol ============
 
     /**
@@ -217,6 +248,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
         uint64 startTime,
         uint64 stopTime
     ) external nonReentrant returns (uint256) {
+        require(isTokenWhitelisted[token], "Token is not supported");
         require(!newPaymentsPaused, "payment creation paused"); // For admin pause
         require(employee != address(0), "invalid employee");
         require(token != address(0), "invalid token");
@@ -417,6 +449,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
         string calldata description,
         uint256 paymentId
     ) external nonReentrant returns (uint256) {
+        require(isTokenWhitelisted[token], "Token is not supported");
         require(employee != msg.sender, "company cannot be employee");
         require(employee != address(0), "invalid employee");
         require(token != address(0), "invalid token");

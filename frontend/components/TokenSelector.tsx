@@ -1,34 +1,30 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { SEPOLIA_TOKENS, Token, formatToken } from "@/lib/tokens";
+import { WHITELISTED_TOKENS, Token } from "@/lib/tokens";
 
 interface TokenSelectorProps {
   value: string;
   onChange: (token: Token) => void;
   label?: string;
-  allowCustom?: boolean;
 }
 
 export function TokenSelector({
   value,
   onChange,
   label = "Select Token",
-  allowCustom = true,
 }: TokenSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [customAddress, setCustomAddress] = useState("");
-  const [showCustomInput, setShowCustomInput] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Find current selected token
-  const selectedToken = SEPOLIA_TOKENS.find(
+  const selectedToken = WHITELISTED_TOKENS.find(
     (t) => t.address.toLowerCase() === value.toLowerCase()
   );
 
   // Filter tokens by search
-  const filteredTokens = SEPOLIA_TOKENS.filter((token) =>
+  const filteredTokens = WHITELISTED_TOKENS.filter((token) =>
     token.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
     token.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -41,7 +37,6 @@ export function TokenSelector({
         !dropdownRef.current.contains(event.target as Node)
       ) {
         setIsOpen(false);
-        setShowCustomInput(false);
       }
     }
 
@@ -53,26 +48,6 @@ export function TokenSelector({
     onChange(token);
     setIsOpen(false);
     setSearchTerm("");
-    setShowCustomInput(false);
-  };
-
-  const handleCustomSubmit = () => {
-    if (
-      customAddress.match(/^0x[a-fA-F0-9]{40}$/)
-    ) {
-      const customToken: Token = {
-        id: "custom",
-        name: "Custom Token",
-        symbol: customAddress.slice(0, 6) + "...",
-        address: customAddress,
-        decimals: 18,
-        logo: "❓",
-      };
-      onChange(customToken);
-      setIsOpen(false);
-      setCustomAddress("");
-      setShowCustomInput(false);
-    }
   };
 
   return (
@@ -137,48 +112,6 @@ export function TokenSelector({
               </div>
             )}
           </div>
-
-          {/* Custom Token Option */}
-          {allowCustom && !showCustomInput && (
-            <button
-              onClick={() => setShowCustomInput(true)}
-              className="w-full px-4 py-3 text-left hover:bg-blue-50 text-blue-600 border-t border-gray-200 flex items-center gap-2"
-            >
-              <span>➕</span>
-              <span>Add Custom Token</span>
-            </button>
-          )}
-
-          {/* Custom Token Input */}
-          {allowCustom && showCustomInput && (
-            <div className="px-4 py-3 border-t border-gray-200 space-y-2">
-              <input
-                type="text"
-                placeholder="Token contract address (0x...)"
-                value={customAddress}
-                onChange={(e) => setCustomAddress(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <div className="flex gap-2">
-                <button
-                  onClick={handleCustomSubmit}
-                  disabled={!customAddress.match(/^0x[a-fA-F0-9]{40}$/)}
-                  className="flex-1 px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                >
-                  Add
-                </button>
-                <button
-                  onClick={() => {
-                    setShowCustomInput(false);
-                    setCustomAddress("");
-                  }}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
