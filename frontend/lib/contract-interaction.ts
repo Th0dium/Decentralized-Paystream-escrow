@@ -16,9 +16,8 @@ const PAYSTREAM_ABI = [
       { internalType: "uint256", name: "totalAmount", type: "uint256" },
       { internalType: "uint64", name: "startTime", type: "uint64" },
       { internalType: "uint64", name: "stopTime", type: "uint64" },
-      { internalType: "uint16", name: "escrowBps", type: "uint16" },
     ],
-    name: "createStream",
+    name: "createPayment",
     outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
     stateMutability: "nonpayable",
     type: "function",
@@ -85,7 +84,7 @@ export async function approveTokens(
 }
 
 /**
- * Create a stream on the Paystream contract
+ * Create a payment stream on the Paystream contract
  */
 export async function createStream(
   contractAddress: Address,
@@ -93,7 +92,6 @@ export async function createStream(
   tokenAddress: Address,
   totalAmount: string,
   durationDays: number,
-  escrowPercentage: number,
   tokenDecimals: number = 18
 ): Promise<{ transactionHash: string; streamId?: string }> {
 
@@ -105,30 +103,25 @@ export async function createStream(
   // Convert amount to wei
   const amountInWei = parseUnits(totalAmount, tokenDecimals);
 
-  // Convert percentage to basis points (0-10000)
-  // uint16 max is 65535, bps should be 0-10000 (0-100%)
-  const escrowBps = Math.min(Math.floor(escrowPercentage * 100), 10000);
-
-  console.log("\n💰 === CREATE STREAM (viem) ===");
+  console.log("\n💰 === CREATE PAYMENT (viem) ===");
   console.log(`📍 Contract: ${contractAddress}`);
   console.log(`👤 Employee: ${employeeAddress}`);
   console.log(`💰 Amount: ${totalAmount} tokens (${amountInWei} wei)`);
   console.log(`📅 Duration: ${durationDays} days`);
-  console.log(`🎯 Escrow BPS: ${escrowBps}`);
+  console.log(`⏰ Start: ${startTime}, Stop: ${stopTime}`);
 
   try {
-    console.log("\n📤 Submitting createStream transaction...");
+    console.log("\n📤 Submitting createPayment transaction...");
     const hash = await writeContract(config, {
         address: contractAddress,
         abi: PAYSTREAM_ABI,
-        functionName: "createStream",
+        functionName: "createPayment",
         args: [
             employeeAddress,
             tokenAddress,
             amountInWei,
             BigInt(startTime),
-            BigInt(stopTime),
-            escrowBps
+            BigInt(stopTime)
         ],
     });
 
@@ -139,10 +132,10 @@ export async function createStream(
       transactionHash: hash,
     };
   } catch (error) {
-    console.error("\n❌ === CREATE STREAM FAILED ===");
+    console.error("\n❌ === CREATE PAYMENT FAILED ===");
     if (error instanceof Error) {
       console.error("Error:", error.message);
-      throw new Error(`Failed to create stream: ${error.message}`);
+      throw new Error(`Failed to create payment: ${error.message}`);
     }
     throw error;
   }
