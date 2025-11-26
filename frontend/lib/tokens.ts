@@ -1,5 +1,5 @@
 /**
- * List of common ERC20 tokens on Mainnet
+ * List of common ERC20 tokens on Sepolia Testnet
  */
 
 export interface Token {
@@ -11,13 +11,14 @@ export interface Token {
   logo?: string;
 }
 
-// Whitelisted tokens on Mainnet
+// Whitelisted tokens on Sepolia Testnet
+// Note: These are commonly used test tokens. Verify addresses match your faucet/deployment
 export const WHITELISTED_TOKENS: Token[] = [
   {
     id: "usdc",
     name: "USD Coin",
     symbol: "USDC",
-    address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    address: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
     decimals: 6,
     logo: "🟢",
   },
@@ -25,7 +26,7 @@ export const WHITELISTED_TOKENS: Token[] = [
     id: "dai",
     name: "Dai Stablecoin",
     symbol: "DAI",
-    address: "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+    address: "0xFF34B3d4Aee5D82176c1e28C29d5CC3d426eB39D",
     decimals: 18,
     logo: "🟡",
   },
@@ -33,7 +34,7 @@ export const WHITELISTED_TOKENS: Token[] = [
     id: "usdt",
     name: "Tether USD",
     symbol: "USDT",
-    address: "0xdac17F958D2ee523a2206206994597C13D831ec7",
+    address: "0xaA8E23Fb1079EA71e0a56F48a2aA51851D8433D0",
     decimals: 6,
     logo: "🔵",
   },

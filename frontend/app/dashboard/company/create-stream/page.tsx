@@ -99,8 +99,8 @@ export default function CreateStreamPage() {
     setTransactionHash(null);
 
     if (!isCorrectNetwork || !account) {
-        setError("Please connect your wallet and ensure you are on the correct network.");
-        return;
+      setError("Please connect your wallet and ensure you are on the correct network.");
+      return;
     }
 
     // Validation
@@ -152,23 +152,23 @@ export default function CreateStreamPage() {
 
       console.log("\n🚀 Starting stream creation process...");
 
+      // Calculate total amount from paystream and escrow
+      const paystreamAmt = enablePaystream ? parseFloat(formData.paystreamAmount || "0") : 0;
+      const escrowAmt = escrowItems.reduce((sum, item) => sum + parseFloat(item.amount || "0"), 0);
+      const totalAmount = paystreamAmt + escrowAmt;
+
       // Step 1: Approve tokens
       console.log("\n📝 Step 1: Approving tokens...");
       const approvalHash = await approveTokens(
         selectedToken.address as Address,
         contractAddress,
-        formData.totalAmount,
+        totalAmount.toString(),
         selectedToken.decimals
       );
       console.log(`✅ Approval hash: ${approvalHash}`);
 
       // Step 2: Create stream
       console.log("\n📝 Step 2: Creating stream...");
-
-      // Calculate total amount from paystream and escrow
-      const paystreamAmt = enablePaystream ? parseFloat(formData.paystreamAmount || "0") : 0;
-      const escrowAmt = escrowItems.reduce((sum, item) => sum + parseFloat(item.amount || "0"), 0);
-      const totalAmount = paystreamAmt + escrowAmt;
 
       // Calculate escrow percentage based on selected payment methods
       let escrowPercentage = 0;
@@ -224,14 +224,14 @@ export default function CreateStreamPage() {
 
   if (!isConnected) {
     return (
-        <div className="max-w-2xl">
-            <h1 className="text-3xl font-bold mb-8">Create Payment</h1>
-            <Card>
-                <div className="p-8 text-center">
-                    <p className="text-gray-600">Please connect your wallet to create a payment.</p>
-                </div>
-            </Card>
-        </div>
+      <div className="max-w-2xl">
+        <h1 className="text-3xl font-bold mb-8">Create Payment</h1>
+        <Card>
+          <div className="p-8 text-center">
+            <p className="text-gray-600">Please connect your wallet to create a payment.</p>
+          </div>
+        </Card>
+      </div>
     );
   }
 
@@ -261,20 +261,20 @@ export default function CreateStreamPage() {
           <fieldset disabled={!isCorrectNetwork || isSubmitting}>
             {/* Employee Address */}
             <div>
-                <label className="block text-sm font-medium mb-2">
+              <label className="block text-sm font-medium mb-2">
                 Employee Wallet Address
-                </label>
-                <input
+              </label>
+              <input
                 type="text"
                 name="employeeAddress"
                 value={formData.employeeAddress}
                 onChange={handleChange}
                 placeholder="0x..."
                 className="input-base"
-                />
-                <p className="text-xs text-gray-500 mt-1">
+              />
+              <p className="text-xs text-gray-500 mt-1">
                 Must be a valid Ethereum address
-                </p>
+              </p>
             </div>
 
             {/* Payment Method - Two Tables Side by Side */}
@@ -436,98 +436,98 @@ export default function CreateStreamPage() {
 
             {/* Currency Selection */}
             <div>
-                <label className="block text-sm font-medium mb-2">Currency (ERC20)</label>
-                {showTokenSelector ? (
+              <label className="block text-sm font-medium mb-2">Currency (ERC20)</label>
+              {showTokenSelector ? (
                 <TokenSelector
-                    value={selectedToken.address}
-                    onChange={handleTokenChange}
+                  value={selectedToken.address}
+                  onChange={handleTokenChange}
                 />
-                ) : (
+              ) : (
                 <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2">
                     <span className="text-xl">{selectedToken.logo || "💰"}</span>
                     <span className="font-semibold">{selectedToken.symbol} - {selectedToken.name}</span>
-                    </div>
-                    <button
+                  </div>
+                  <button
                     type="button"
                     onClick={() => setShowTokenSelector(true)}
                     className="text-sm font-medium text-blue-600 hover:text-blue-800"
-                    >
+                  >
                     Change
-                    </button>
+                  </button>
                 </div>
-                )}
+              )}
             </div>
 
             {/* Stream Summary */}
             {totalAmount > 0 && (
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
                 <div className="mb-3">
-                    <h3 className="font-semibold">Stream Summary</h3>
-                    <p className="text-xs text-gray-600 mt-1">
+                  <h3 className="font-semibold">Stream Summary</h3>
+                  <p className="text-xs text-gray-600 mt-1">
                     Breakdown of your payment
-                    </p>
+                  </p>
                 </div>
                 <div className="space-y-3 text-sm">
-                    <div className="flex justify-between items-center pb-3 border-b border-blue-200">
+                  <div className="flex justify-between items-center pb-3 border-b border-blue-200">
                     <span className="text-gray-700">
-                        Total Amount to Employee
+                      Total Amount to Employee
                     </span>
                     <span className="font-bold text-lg">
-                        {totalAmount.toFixed(2)} {selectedToken.symbol}
+                      {totalAmount.toFixed(2)} {selectedToken.symbol}
                     </span>
-                    </div>
+                  </div>
 
-                    <div className="space-y-2">
+                  <div className="space-y-2">
                     {enablePaystream && (
-                        <div>
+                      <div>
                         <div className="flex justify-between mb-1">
-                            <span className="text-gray-600 flex items-center">
+                          <span className="text-gray-600 flex items-center">
                             <span className="text-lg mr-2">💰</span>Paystream
-                            </span>
-                            <span className="font-semibold">
+                          </span>
+                          <span className="font-semibold">
                             {paystreamAmount.toFixed(2)} {selectedToken.symbol}
-                            </span>
+                          </span>
                         </div>
                         <p className="text-xs text-gray-500 ml-6">
-                            {formData.paystreamDuration} days • {(paystreamAmount / formData.paystreamDuration).toFixed(2)} {selectedToken.symbol}/day
+                          {formData.paystreamDuration} days • {(paystreamAmount / formData.paystreamDuration).toFixed(2)} {selectedToken.symbol}/day
                         </p>
-                        </div>
+                      </div>
                     )}
                     {enableEscrow && (
-                        <div>
+                      <div>
                         <div className="flex justify-between mb-1">
-                            <span className="text-gray-600 flex items-center">
+                          <span className="text-gray-600 flex items-center">
                             <span className="text-lg mr-2">🎯</span>Escrow Milestones
-                            </span>
-                            <span className="font-semibold text-purple-600">
+                          </span>
+                          <span className="font-semibold text-purple-600">
                             {totalEscrowAmount.toFixed(2)} {selectedToken.symbol}
-                            </span>
+                          </span>
                         </div>
                         <p className="text-xs text-gray-500 ml-6">
-                            {escrowItems.length} milestone{escrowItems.length !== 1 ? "s" : ""}
+                          {escrowItems.length} milestone{escrowItems.length !== 1 ? "s" : ""}
                         </p>
-                        </div>
+                      </div>
                     )}
-                    </div>
+                  </div>
 
-                    <div className="pt-2 border-t border-blue-200">
+                  <div className="pt-2 border-t border-blue-200">
                     <p className="text-xs text-gray-600 text-center">
-                        ℹ️ Includes platform fees and gas costs calculated at transaction time
+                      ℹ️ Includes platform fees and gas costs calculated at transaction time
                     </p>
-                    </div>
+                  </div>
                 </div>
-                </div>
+              </div>
             )}
 
             <Button
-                type="submit"
-                variant="primary"
-                loading={isSubmitting}
-                className="w-full"
-                disabled={!isCorrectNetwork || isSubmitting}
+              type="submit"
+              variant="primary"
+              loading={isSubmitting}
+              className="w-full"
+              disabled={!isCorrectNetwork || isSubmitting}
             >
-                Create Payment
+              Create Payment
             </Button>
           </fieldset>
         </form>
