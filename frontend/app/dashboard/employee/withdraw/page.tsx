@@ -133,12 +133,6 @@ export default function WithdrawPage() {
                       tokens
                     </p>
                   </div>
-                  <div>
-                    <p className="text-gray-600">Escrow %</p>
-                    <p className="font-semibold">
-                      {(selectedStream.escrowBps / 100).toFixed(1)}%
-                    </p>
-                  </div>
                 </div>
               </div>
             )}

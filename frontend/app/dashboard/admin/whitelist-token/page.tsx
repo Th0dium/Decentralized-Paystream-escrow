@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import { useAccount } from "wagmi";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Card } from "@/components/Card";
+import { Button } from "@/components/Button";
 import { isTokenWhitelisted, whitelistToken } from "@/lib/whitelist-utility";
 import { Address } from "viem";
 
@@ -112,12 +111,12 @@ export default function WhitelistTokenPage() {
             <label className="block text-sm font-medium text-white mb-2">
               Contract Address
             </label>
-            <Input
+            <input
               type="text"
               placeholder="0x..."
               value={contractAddress}
               onChange={(e) => setContractAddress(e.target.value)}
-              className="bg-slate-700 border-slate-600 text-white placeholder-slate-500"
+              className="w-full px-3 py-2 rounded-md border bg-slate-700 border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
@@ -126,12 +125,12 @@ export default function WhitelistTokenPage() {
             <label className="block text-sm font-medium text-white mb-2">
               Token Address to Whitelist
             </label>
-            <Input
+            <input
               type="text"
               placeholder="0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
               value={tokenAddress}
               onChange={(e) => setTokenAddress(e.target.value)}
-              className="bg-slate-700 border-slate-600 text-white placeholder-slate-500"
+              className="w-full px-3 py-2 rounded-md border bg-slate-700 border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <p className="text-xs text-slate-400 mt-2">
               Default: Sepolia USDC (0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238)

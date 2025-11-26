@@ -60,7 +60,7 @@ export default function EmployeeStreamsPage() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
                 <div>
                   <div className="text-sm text-gray-600">Total Amount</div>
                   <div className="text-lg font-semibold">
@@ -77,12 +77,6 @@ export default function EmployeeStreamsPage() {
                   <div className="text-sm text-gray-600">Escrowed</div>
                   <div className="text-lg font-semibold text-purple-600">
                     {(BigInt(stream.escrowed) / BigInt(10 ** 18)).toString()} Tokens
-                  </div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-600">Escrow %</div>
-                  <div className="text-lg font-semibold">
-                    {(stream.escrowBps / 100).toFixed(1)}%
                   </div>
                 </div>
               </div>

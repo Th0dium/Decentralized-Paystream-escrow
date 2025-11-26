@@ -7,6 +7,7 @@ import { TokenSelector } from "@/components/TokenSelector";
 import { useAuth } from "@/lib/hooks";
 import { approveTokens } from "@/lib/contract-interaction";
 import { Token } from "@/lib/tokens";
+import { Address } from "viem";
 
 export default function DepositPage() {
   const { walletAddress } = useAuth();
@@ -61,8 +62,8 @@ export default function DepositPage() {
       // Approve tokens for the contract
       console.log("\n📝 Step 1: Approving tokens...");
       const approvalHash = await approveTokens(
-        selectedToken.address,
-        contractAddress,
+        selectedToken.address as Address,
+        contractAddress as Address,
         formData.amount
       );
       console.log(`✅ Approval hash: ${approvalHash}`);
@@ -115,7 +116,6 @@ export default function DepositPage() {
             value={selectedToken?.address || ""}
             onChange={setSelectedToken}
             label="Select Token to Deposit"
-            allowCustom={true}
           />
 
           <div>
@@ -141,7 +141,7 @@ export default function DepositPage() {
             <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside">
               <li>Select a token from the dropdown</li>
               <li>Specify the amount you want to deposit</li>
-              <li>Click "Approve & Deposit Tokens"</li>
+              <li>Click &quot;Approve & Deposit Tokens&quot;</li>
               <li>Confirm the transaction in your wallet</li>
               <li>Use the approved tokens to create salary streams</li>
             </ul>

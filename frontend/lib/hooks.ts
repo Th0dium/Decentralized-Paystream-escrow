@@ -14,12 +14,20 @@ export const useAuth = () => {
   const { address: walletAddress, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
   const store = useAuthStore();
+  const { verify } = useVerifyWallet(); // Get verify function
 
   // Hydrate from localStorage on mount (once)
   useEffect(() => {
     store.hydrate();
     setIsHydrated(true);
   }, []);
+
+  // Auto-verify when wallet is connected and not yet authenticated in the store
+  useEffect(() => {
+    if (isConnected && walletAddress && !store.walletAddress) {
+      verify(walletAddress);
+    }
+  }, [isConnected, walletAddress, store.walletAddress, verify]);
 
   // Auto-logout if wallet disconnected or address changed
   useEffect(() => {
@@ -41,7 +49,7 @@ export const useAuth = () => {
         store.logout();
       }
     }
-  }, [isHydrated, isConnected, walletAddress, store.walletAddress]);
+  }, [isHydrated, isConnected, walletAddress, store.walletAddress, disconnect, store.logout]);
 
   // User is fully authenticated if:
   // 1. Store has been hydrated

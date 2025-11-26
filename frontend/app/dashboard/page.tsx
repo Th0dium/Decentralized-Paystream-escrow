@@ -5,7 +5,15 @@ import { useAuth } from "@/lib/hooks";
 import Link from "next/link";
 
 export default function DashboardPage() {
-  const { role, walletAddress } = useAuth();
+  const { isCompany, isEmployee, isAuditor, walletAddress } = useAuth();
+
+  const role = isCompany
+    ? "COMPANY"
+    : isEmployee
+    ? "EMPLOYEE"
+    : isAuditor
+    ? "AUDITOR"
+    : "GUEST";
 
   return (
     <div>
@@ -15,7 +23,7 @@ export default function DashboardPage() {
         <Card>
           <div className="text-sm text-gray-600 mb-2">Your Role</div>
           <div className="text-2xl font-bold text-blue-600">
-            {role || "Not Set"}
+            {role}
           </div>
         </Card>
 
@@ -84,7 +92,7 @@ export default function DashboardPage() {
           </>
         )}
 
-        {(role === "COMPANY" || !role) && (
+        {(role === "COMPANY" || role === "GUEST") && (
           <>
             <Card>
               <h3 className="text-xl font-semibold mb-4">Quick Actions</h3>
