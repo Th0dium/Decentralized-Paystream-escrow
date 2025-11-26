@@ -168,16 +168,10 @@ export default function CreateStreamPage() {
       console.log(`✅ Approval hash: ${approvalHash}`);
 
       // Step 2: Create stream
-      console.log("\n📝 Step 2: Creating stream...");
+      console.log("\n📝 Step 2: Creating payment stream...");
 
-      // Calculate escrow percentage based on selected payment methods
-      let escrowPercentage = 0;
-      if (enableEscrow && totalAmount > 0) {
-        escrowPercentage = Math.round((escrowAmt / totalAmount) * 100);
-      }
-
-      // Use paystream duration or default to 0 if escrow-only
-      const duration = enablePaystream ? formData.paystreamDuration : 0;
+      // Use paystream duration
+      const duration = formData.paystreamDuration;
 
       const result = await createStream(
         contractAddress,
@@ -185,7 +179,6 @@ export default function CreateStreamPage() {
         selectedToken.address as Address,
         totalAmount.toString(),
         duration,
-        escrowPercentage,
         selectedToken.decimals
       );
 
