@@ -5,7 +5,7 @@ import { useAccount } from "wagmi";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { TokenSelector } from "@/components/TokenSelector";
-import { approveTokens, createStream, checkTokenWhitelisted } from "@/lib/contract-interaction";
+import { approveTokens, createStream, createEscrow, checkTokenWhitelisted } from "@/lib/contract-interaction";
 import { Token, WHITELISTED_TOKENS } from "@/lib/tokens";
 import { Address } from "viem";
 
@@ -167,10 +167,11 @@ export default function CreateStreamPage() {
           setError("All escrow milestones must have a valid amount");
           return;
         }
-        if (!item.deadline) {
-          setError("All escrow milestones must have a deadline");
+        if (!item.description) {
+          setError("All escrow milestones must have a description");
           return;
         }
+        // Note: Deadline is stored for UI but not currently used in contract call (no deadline param in createEscrow)
       }
     }
 
@@ -199,26 +200,65 @@ export default function CreateStreamPage() {
       );
       console.log(`✅ Approval hash: ${approvalHash}`);
 
-      // Step 2: Create stream
-      console.log("\n📝 Step 2: Creating payment stream...");
+      let paymentId = "0";
+      let streamTxHash = null;
 
-      // Use paystream duration
-      const duration = formData.paystreamDuration;
+      // Step 2: Create Paystream (if enabled)
+      if (enablePaystream) {
+        console.log("\n📝 Step 2: Creating payment stream...");
+        const duration = formData.paystreamDuration;
 
-      const result = await createStream(
-        contractAddress,
-        formData.employeeAddress as Address,
-        selectedToken.address as Address,
-        totalAmount.toString(),
-        duration,
-        selectedToken.decimals
-      );
+        const result = await createStream(
+          contractAddress,
+          formData.employeeAddress as Address,
+          selectedToken.address as Address,
+          formData.paystreamAmount,
+          duration,
+          selectedToken.decimals
+        );
+        
+        streamTxHash = result.transactionHash;
+        if (result.streamId) {
+           paymentId = result.streamId;
+           console.log(`✅ Stream created with ID: ${paymentId}`);
+        } else {
+           console.warn("⚠️ Stream created but ID not found in logs. Escrows will be unlinked.");
+        }
+      }
 
-      console.log(`\n✅ Stream created successfully!`);
-      console.log(`Transaction hash: ${result.transactionHash}`);
+      // Step 3: Create Escrows (if enabled)
+      if (enableEscrow) {
+        console.log("\n📝 Step 3: Creating escrow milestones...");
+        
+        for (let i = 0; i < escrowItems.length; i++) {
+          const item = escrowItems[i];
+          console.log(`   Creating milestone ${i + 1}/${escrowItems.length}...`);
+          
+          // We don't need deadline for the contract call currently, just amount and description
+          const escrowResult = await createEscrow(
+            contractAddress,
+            formData.employeeAddress as Address,
+            selectedToken.address as Address,
+            item.amount,
+            item.description,
+            paymentId,
+            selectedToken.decimals
+          );
+          console.log(`   ✅ Milestone ${i + 1} created: ${escrowResult.transactionHash}`);
+          
+          // If this is the only transaction (no paystream), show this hash
+          if (!streamTxHash) {
+            streamTxHash = escrowResult.transactionHash;
+          }
+        }
+      }
 
-      setSuccess("Stream created successfully! Check Etherscan for transaction details.");
-      setTransactionHash(result.transactionHash);
+      console.log(`\n✅ All operations completed successfully!`);
+      
+      setSuccess("Payment setup created successfully! Check Etherscan for transaction details.");
+      if (streamTxHash) {
+        setTransactionHash(streamTxHash);
+      }
 
       // Reset form
       setFormData({
@@ -231,8 +271,8 @@ export default function CreateStreamPage() {
       setEnableEscrow(false);
       setSelectedToken(WHITELISTED_TOKENS[0]); // Reset to default
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "Failed to create stream";
-      console.error("❌ Error creating stream:", errorMsg);
+      const errorMsg = err instanceof Error ? err.message : "Failed to create payment setup";
+      console.error("❌ Error creating payment setup:", errorMsg);
       setError(errorMsg);
     } finally {
       setIsSubmitting(false);
@@ -277,7 +317,7 @@ export default function CreateStreamPage() {
               <p className="text-sm text-green-600">{success}</p>
               {transactionHash && (
                 <p className="text-xs text-gray-600 mt-2 font-mono break-all">
-                  Tx: {transactionHash}
+                  Last Tx: {transactionHash}
                 </p>
               )}
             </div>

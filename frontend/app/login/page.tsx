@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
 
 import { useAuth, useVerifyWallet } from "@/lib/hooks";
-import { WALLET_CONFIG } from "@/lib/constants";
 
 export default function LoginPage() {
   const router = useRouter();

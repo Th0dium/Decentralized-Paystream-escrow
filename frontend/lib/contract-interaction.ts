@@ -1,4 +1,4 @@
-import { parseUnits, Address } from "viem";
+import { parseUnits, Address, keccak256, toBytes, decodeEventLog } from "viem";
 import { 
   writeContract, 
   readContract, 
@@ -21,6 +21,34 @@ const PAYSTREAM_ABI = [
     outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
     stateMutability: "nonpayable",
     type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "employee", type: "address" },
+      { internalType: "address", name: "token", type: "address" },
+      { internalType: "uint256", name: "amount", type: "uint256" },
+      { internalType: "bytes32", name: "descriptionHash", type: "bytes32" },
+      { internalType: "uint256", name: "paymentId", type: "uint256" },
+    ],
+    name: "createEscrow",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: "uint256", name: "paymentId", type: "uint256" },
+      { indexed: true, internalType: "address", name: "company", type: "address" },
+      { indexed: true, internalType: "address", name: "employee", type: "address" },
+      { indexed: false, internalType: "address", name: "token", type: "address" },
+      { indexed: false, internalType: "uint256", name: "totalAmount", type: "uint256" },
+      { indexed: false, internalType: "uint64", name: "startTime", type: "uint64" },
+      { indexed: false, internalType: "uint64", name: "stopTime", type: "uint64" },
+      { indexed: false, internalType: "uint256", name: "feeAmount", type: "uint256" },
+    ],
+    name: "PaymentCreated",
+    type: "event",
   },
   {
     inputs: [{ internalType: "address", name: "token", type: "address" }],
@@ -133,16 +161,93 @@ export async function createStream(
     });
 
     console.log(`✅ Transaction sent: ${hash}`);
-    await waitForTransactionReceipt(config, { hash });
+    const receipt = await waitForTransactionReceipt(config, { hash });
+    
+    // Parse logs to find PaymentCreated event and extract paymentId
+    let streamId: string | undefined;
+    for (const log of receipt.logs) {
+      try {
+        const decodedLog = decodeEventLog({
+          abi: PAYSTREAM_ABI,
+          eventName: 'PaymentCreated',
+          data: log.data,
+          topics: log.topics,
+        });
+        if (decodedLog.eventName === 'PaymentCreated') {
+          streamId = decodedLog.args.paymentId.toString();
+          console.log(`✅ Found PaymentCreated event. ID: ${streamId}`);
+          break;
+        }
+      } catch {
+        // Not our event, ignore
+      }
+    }
 
     return {
       transactionHash: hash,
+      streamId
     };
   } catch (error) {
     console.error("\n❌ === CREATE PAYMENT FAILED ===");
     if (error instanceof Error) {
       console.error("Error:", error.message);
       throw new Error(`Failed to create payment: ${error.message}`);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Create an escrow milestone
+ */
+export async function createEscrow(
+  contractAddress: Address,
+  employeeAddress: Address,
+  tokenAddress: Address,
+  amount: string,
+  description: string,
+  paymentId: string = "0", // Default to 0 (standalone)
+  tokenDecimals: number = 18
+): Promise<{ transactionHash: string }> {
+
+  const amountInWei = parseUnits(amount, tokenDecimals);
+  // Create a bytes32 hash of the description
+  const descriptionHash = keccak256(toBytes(description));
+  const paymentIdBigInt = BigInt(paymentId);
+
+  console.log("\n🎯 === CREATE ESCROW (viem) ===");
+  console.log(`📍 Contract: ${contractAddress}`);
+  console.log(`👤 Employee: ${employeeAddress}`);
+  console.log(`💰 Amount: ${amount} tokens (${amountInWei} wei)`);
+  console.log(`📝 Desc Hash: ${descriptionHash}`);
+  console.log(`🔗 Payment ID: ${paymentId}`);
+
+  try {
+    console.log("\n📤 Submitting createEscrow transaction...");
+    const hash = await writeContract(config, {
+        address: contractAddress,
+        abi: PAYSTREAM_ABI,
+        functionName: "createEscrow",
+        args: [
+            employeeAddress,
+            tokenAddress,
+            amountInWei,
+            descriptionHash,
+            paymentIdBigInt
+        ],
+    });
+
+    console.log(`✅ Transaction sent: ${hash}`);
+    await waitForTransactionReceipt(config, { hash });
+
+    return {
+      transactionHash: hash,
+    };
+  } catch (error) {
+    console.error("\n❌ === CREATE ESCROW FAILED ===");
+    if (error instanceof Error) {
+      console.error("Error:", error.message);
+      throw new Error(`Failed to create escrow: ${error.message}`);
     }
     throw error;
   }

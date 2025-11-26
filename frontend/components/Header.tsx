@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useAuth } from "@/lib/hooks";
 import { useRouter } from "next/navigation";
-import { Web3Button } from "@web3modal/wagmi/react";
 
 export default function Header() {
   const router = useRouter();
@@ -24,7 +23,7 @@ export default function Header() {
 
           {isAuthenticated ? (
             <div className="flex items-center gap-4">
-              <Web3Button />
+              <w3m-button />
               <button
                 onClick={handleLogout}
                 className="btn-secondary text-sm"
@@ -33,7 +32,7 @@ export default function Header() {
               </button>
             </div>
           ) : (
-            <Web3Button />
+            <w3m-button />
           )}
         </div>
       </div>
