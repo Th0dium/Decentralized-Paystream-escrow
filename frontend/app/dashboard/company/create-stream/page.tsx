@@ -5,7 +5,7 @@ import { useAccount } from "wagmi";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { TokenSelector } from "@/components/TokenSelector";
-import { approveTokens, createStream } from "@/lib/contract-interaction";
+import { approveTokens, createStream, checkTokenWhitelisted } from "@/lib/contract-interaction";
 import { Token, WHITELISTED_TOKENS } from "@/lib/tokens";
 import { Address } from "viem";
 
@@ -38,6 +38,7 @@ export default function CreateStreamPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [transactionHash, setTransactionHash] = useState<string | null>(null);
+  const [tokenWhitelistWarning, setTokenWhitelistWarning] = useState<string | null>(null);
 
   const expectedChainId = parseInt(process.env.NEXT_PUBLIC_CHAIN_ID || "11155111");
   const isCorrectNetwork = isConnected && chainId === expectedChainId;
@@ -49,6 +50,37 @@ export default function CreateStreamPage() {
       setError(null);
     }
   }, [isConnected, isCorrectNetwork, expectedChainId]);
+
+  // Check token whitelist status when token changes
+  useEffect(() => {
+    const checkWhitelist = async () => {
+      if (!isCorrectNetwork || !selectedToken) return;
+
+      const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS as Address;
+      if (!contractAddress) return;
+
+      try {
+        const isWhitelisted = await checkTokenWhitelisted(
+          contractAddress,
+          selectedToken.address as Address
+        );
+
+        if (!isWhitelisted) {
+          setTokenWhitelistWarning(
+            `⚠️ Warning: ${selectedToken.symbol} is not whitelisted on the contract. Payment creation may fail. Please whitelist the token first at /dashboard/admin/whitelist-token`
+          );
+        } else {
+          setTokenWhitelistWarning(null);
+        }
+      } catch (err) {
+        console.error("Error checking whitelist:", err);
+        // Don't show error if just a read error, let user try
+        setTokenWhitelistWarning(null);
+      }
+    };
+
+    checkWhitelist();
+  }, [selectedToken, isCorrectNetwork]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -248,6 +280,12 @@ export default function CreateStreamPage() {
                   Tx: {transactionHash}
                 </p>
               )}
+            </div>
+          )}
+
+          {tokenWhitelistWarning && (
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-800">{tokenWhitelistWarning}</p>
             </div>
           )}
 
