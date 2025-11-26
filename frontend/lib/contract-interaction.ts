@@ -106,12 +106,15 @@ export async function createStream(
   const amountInWei = parseUnits(totalAmount, tokenDecimals);
 
   // Convert percentage to basis points (0-10000)
-  const escrowBps = Math.floor(escrowPercentage * 100);
+  // uint16 max is 65535, bps should be 0-10000 (0-100%)
+  const escrowBps = Math.min(Math.floor(escrowPercentage * 100), 10000);
 
   console.log("\n💰 === CREATE STREAM (viem) ===");
   console.log(`📍 Contract: ${contractAddress}`);
   console.log(`👤 Employee: ${employeeAddress}`);
-  // ... (rest of the logs)
+  console.log(`💰 Amount: ${totalAmount} tokens (${amountInWei} wei)`);
+  console.log(`📅 Duration: ${durationDays} days`);
+  console.log(`🎯 Escrow BPS: ${escrowBps}`);
 
   try {
     console.log("\n📤 Submitting createStream transaction...");
