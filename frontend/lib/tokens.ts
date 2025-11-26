@@ -26,7 +26,7 @@ export const WHITELISTED_TOKENS: Token[] = [
     id: "dai",
     name: "Dai Stablecoin",
     symbol: "DAI",
-    address: "0xFF34B3d4Aee5D82176c1e28C29d5CC3d426eB39D",
+    address: "0xff34B3d4aEE5D82176C1E28c29d5cc3d426eb39D",
     decimals: 18,
     logo: "🟡",
   },

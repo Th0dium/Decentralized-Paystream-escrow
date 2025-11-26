@@ -22,6 +22,13 @@ const PAYSTREAM_ABI = [
     stateMutability: "nonpayable",
     type: "function",
   },
+  {
+    inputs: [{ internalType: "address", name: "token", type: "address" }],
+    name: "isTokenWhitelisted",
+    outputs: [{ internalType: "bool", name: "", type: "bool" }],
+    stateMutability: "view",
+    type: "function",
+  },
 ] as const; // Add 'as const' for better type inference with viem
 
 // ERC20 ABI for approve function
@@ -169,4 +176,25 @@ export async function getTokenDecimals(
         functionName: 'decimals',
     });
     return decimals;
+}
+
+/**
+ * Check if token is whitelisted on the Paystream contract
+ */
+export async function checkTokenWhitelisted(
+  contractAddress: Address,
+  tokenAddress: Address
+): Promise<boolean> {
+    try {
+        const isWhitelisted = await readContract(config, {
+            address: contractAddress,
+            abi: PAYSTREAM_ABI,
+            functionName: 'isTokenWhitelisted',
+            args: [tokenAddress]
+        });
+        return isWhitelisted as boolean;
+    } catch (error) {
+        console.error("Error checking token whitelist:", error);
+        return false;
+    }
 }

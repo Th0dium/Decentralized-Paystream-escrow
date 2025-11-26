@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useAuth } from "@/lib/hooks";
 import { useRouter } from "next/navigation";
+import { Web3Button } from "@web3modal/wagmi/react";
 
 export default function Header() {
   const router = useRouter();
-  const { isAuthenticated, walletAddress, logout } = useAuth();
+  const { isAuthenticated, logout } = useAuth(); // Removed walletAddress from destructuring
 
   const handleLogout = () => {
     logout(); // This now handles both disconnect and store cleanup
@@ -21,11 +22,9 @@ export default function Header() {
             Paystream
           </Link>
 
-          {isAuthenticated && walletAddress && (
+          {isAuthenticated ? (
             <div className="flex items-center gap-4">
-              <div className="text-sm text-gray-600">
-                {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
-              </div>
+              <Web3Button />
               <button
                 onClick={handleLogout}
                 className="btn-secondary text-sm"
@@ -33,6 +32,8 @@ export default function Header() {
                 Logout
               </button>
             </div>
+          ) : (
+            <Web3Button />
           )}
         </div>
       </div>
