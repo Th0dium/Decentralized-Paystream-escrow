@@ -190,6 +190,11 @@ export default function CreateStreamPage() {
       const escrowAmt = escrowItems.reduce((sum, item) => sum + parseFloat(item.amount || "0"), 0);
       const totalAmount = paystreamAmt + escrowAmt;
 
+      console.log(`\n💰 Amount breakdown:`);
+      console.log(`  Paystream: ${paystreamAmt} ${selectedToken.symbol}`);
+      console.log(`  Escrow: ${escrowAmt} ${selectedToken.symbol}`);
+      console.log(`  Total: ${totalAmount} ${selectedToken.symbol}`);
+
       // Step 1: Approve tokens
       console.log("\n📝 Step 1: Approving tokens...");
       const approvalHash = await approveTokens(
@@ -530,62 +535,42 @@ export default function CreateStreamPage() {
               )}
             </div>
 
-            {/* Stream Summary */}
+            {/* Payment Summary */}
             {totalAmount > 0 && (
               <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
                 <div className="mb-3">
-                  <h3 className="font-semibold">Stream Summary</h3>
+                  <h3 className="font-semibold">Payment Summary</h3>
                   <p className="text-xs text-gray-600 mt-1">
                     Breakdown of your payment
                   </p>
                 </div>
+
                 <div className="space-y-3 text-sm">
-                  <div className="flex justify-between items-center pb-3 border-b border-blue-200">
-                    <span className="text-gray-700">
-                      Total Amount to Employee
+                  {enablePaystream && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 flex items-center">
+                        <span className="text-lg mr-2">💰</span>Paystream
+                      </span>
+                      <span className="font-semibold">
+                        {paystreamAmount.toFixed(2)} {selectedToken.symbol}
+                      </span>
+                    </div>
+                  )}
+                  {enableEscrow && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 flex items-center">
+                        <span className="text-lg mr-2">🎯</span>Escrow Milestones
+                      </span>
+                      <span className="font-semibold text-purple-600">
+                        {totalEscrowAmount.toFixed(2)} {selectedToken.symbol}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between py-2 border-t border-blue-200">
+                    <span className="text-gray-700 font-bold">Total</span>
+                    <span className="font-bold text-lg text-blue-600">
+                      {totalAmount.toFixed(6)} {selectedToken.symbol}
                     </span>
-                    <span className="font-bold text-lg">
-                      {totalAmount.toFixed(2)} {selectedToken.symbol}
-                    </span>
-                  </div>
-
-                  <div className="space-y-2">
-                    {enablePaystream && (
-                      <div>
-                        <div className="flex justify-between mb-1">
-                          <span className="text-gray-600 flex items-center">
-                            <span className="text-lg mr-2">💰</span>Paystream
-                          </span>
-                          <span className="font-semibold">
-                            {paystreamAmount.toFixed(2)} {selectedToken.symbol}
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-500 ml-6">
-                          {formData.paystreamDuration} days • {(paystreamAmount / formData.paystreamDuration).toFixed(2)} {selectedToken.symbol}/day
-                        </p>
-                      </div>
-                    )}
-                    {enableEscrow && (
-                      <div>
-                        <div className="flex justify-between mb-1">
-                          <span className="text-gray-600 flex items-center">
-                            <span className="text-lg mr-2">🎯</span>Escrow Milestones
-                          </span>
-                          <span className="font-semibold text-purple-600">
-                            {totalEscrowAmount.toFixed(2)} {selectedToken.symbol}
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-500 ml-6">
-                          {escrowItems.length} milestone{escrowItems.length !== 1 ? "s" : ""}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="pt-2 border-t border-blue-200">
-                    <p className="text-xs text-gray-600 text-center">
-                      ℹ️ Includes platform fees and gas costs calculated at transaction time
-                    </p>
                   </div>
                 </div>
               </div>
