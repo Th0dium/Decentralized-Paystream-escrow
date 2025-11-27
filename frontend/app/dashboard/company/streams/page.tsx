@@ -49,7 +49,7 @@ export default function CompanyStreamsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-lg text-gray-600">Loading streams...</div>
+        <div className="text-lg text-slate-400">Loading streams...</div>
       </div>
     );
   }
@@ -57,7 +57,7 @@ export default function CompanyStreamsPage() {
   if (error) {
     return (
       <Card>
-        <div className="text-red-600">Error: {error}</div>
+        <div className="text-red-400">Error: {error}</div>
       </Card>
     );
   }
@@ -65,7 +65,7 @@ export default function CompanyStreamsPage() {
   return (
     <div>
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Manage Salary Streams</h1>
+        <h1 className="text-3xl font-bold text-slate-100">Manage Salary Streams</h1>
         <Button
           onClick={handleRefresh}
           variant="secondary"
@@ -76,22 +76,22 @@ export default function CompanyStreamsPage() {
       </div>
 
       {!isCompany && (
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-700">
+        <div className="mb-6 p-4 bg-blue-900/20 border border-blue-800/50 rounded-lg">
+          <p className="text-sm text-blue-300">
             💡 You don't have a company role. Data shown below is for viewing only.
           </p>
         </div>
       )}
 
       {actionError && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-sm text-red-600">{actionError}</p>
+        <div className="mb-6 p-4 bg-red-900/20 border border-red-800/50 rounded-lg">
+          <p className="text-sm text-red-300">{actionError}</p>
         </div>
       )}
 
       {streams.length === 0 ? (
         <Card>
-          <p className="text-center text-gray-600 py-8">
+          <p className="text-center text-slate-400 py-8">
             You have not created any streams yet.
           </p>
         </Card>
@@ -101,20 +101,20 @@ export default function CompanyStreamsPage() {
             <Card key={stream.streamId}>
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <h3 className="text-xl font-semibold">
+                  <h3 className="text-xl font-semibold text-slate-100">
                     Stream #{stream.streamId}
                   </h3>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-slate-400">
                     Employee: {stream.employee.slice(0, 6)}...
                     {stream.employee.slice(-4)}
                   </p>
                 </div>
                 <span
                   className={`px-3 py-1 rounded-full text-sm font-medium ${stream.cancelled
-                      ? "bg-red-100 text-red-700"
+                      ? "bg-red-900/30 text-red-300"
                       : stream.paused
-                        ? "bg-yellow-100 text-yellow-700"
-                        : "bg-green-100 text-green-700"
+                        ? "bg-yellow-900/30 text-yellow-300"
+                        : "bg-green-900/30 text-green-300"
                     }`}
                 >
                   {stream.cancelled
@@ -127,29 +127,29 @@ export default function CompanyStreamsPage() {
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div>
-                  <div className="text-sm text-gray-600">Total Amount</div>
-                  <div className="text-lg font-semibold">
+                  <div className="text-sm text-slate-400">Total Amount</div>
+                  <div className="text-lg font-semibold text-slate-100">
                     {(BigInt(stream.totalAmount) / BigInt(10 ** 18)).toString()}{" "}
                     Tokens
                   </div>
                 </div>
                 <div>
-                  <div className="text-sm text-gray-600">Withdrawn</div>
-                  <div className="text-lg font-semibold">
+                  <div className="text-sm text-slate-400">Withdrawn</div>
+                  <div className="text-lg font-semibold text-slate-100">
                     {(BigInt(stream.withdrawn) / BigInt(10 ** 18)).toString()}{" "}
                     Tokens
                   </div>
                 </div>
                 <div>
-                  <div className="text-sm text-gray-600">Escrowed</div>
-                  <div className="text-lg font-semibold text-purple-600">
+                  <div className="text-sm text-slate-400">Escrowed</div>
+                  <div className="text-lg font-semibold text-purple-400">
                     {(BigInt(stream.escrowed) / BigInt(10 ** 18)).toString()}{" "}
                     Tokens
                   </div>
                 </div>
                 <div>
-                  <div className="text-sm text-gray-600">Remaining</div>
-                  <div className="text-lg font-semibold text-blue-600">
+                  <div className="text-sm text-slate-400">Remaining</div>
+                  <div className="text-lg font-semibold text-blue-400">
                     {(
                       BigInt(stream.totalAmount) -
                       BigInt(stream.withdrawn) -
@@ -161,7 +161,7 @@ export default function CompanyStreamsPage() {
                 </div>
               </div>
 
-              <div className="text-sm text-gray-600 mb-6">
+              <div className="text-sm text-slate-400 mb-6">
                 <p>Start: {new Date(stream.startTime * 1000).toLocaleDateString()}</p>
                 <p>End: {new Date(stream.stopTime * 1000).toLocaleDateString()}</p>
               </div>

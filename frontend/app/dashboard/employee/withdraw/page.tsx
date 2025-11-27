@@ -44,7 +44,7 @@ export default function WithdrawPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-lg text-gray-600">Loading...</div>
+        <div className="text-lg text-slate-400">Loading...</div>
       </div>
     );
   }
@@ -53,11 +53,11 @@ export default function WithdrawPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-3xl font-bold mb-8">Withdraw Funds</h1>
+      <h1 className="text-3xl font-bold mb-8 text-slate-100">Withdraw Funds</h1>
 
       {!isEmployee && (
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-700">
+        <div className="mb-6 p-4 bg-blue-900/20 border border-blue-800/50 rounded-lg">
+          <p className="text-sm text-blue-300">
             💡 You don't have an employee role. Data shown below is for viewing only.
           </p>
         </div>
@@ -65,7 +65,7 @@ export default function WithdrawPage() {
 
       {activeStreams.length === 0 ? (
         <Card>
-          <p className="text-center text-gray-600 py-8">
+          <p className="text-center text-slate-400 py-8">
             No active streams available for withdrawal.
           </p>
         </Card>
@@ -73,19 +73,19 @@ export default function WithdrawPage() {
         <Card>
           <form onSubmit={handleWithdraw} className="space-y-6">
             {error && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-600">{error}</p>
+              <div className="p-4 bg-red-900/20 border border-red-800/50 rounded-lg">
+                <p className="text-sm text-red-300">{error}</p>
               </div>
             )}
 
             {success && (
-              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-sm text-green-600">{success}</p>
+              <div className="p-4 bg-green-900/20 border border-green-800/50 rounded-lg">
+                <p className="text-sm text-green-300">{success}</p>
               </div>
             )}
 
             <div>
-              <label className="block text-sm font-medium mb-2">
+              <label className="text-sm font-medium mb-2 text-slate-200">
                 Select Stream
               </label>
               <select
@@ -111,12 +111,12 @@ export default function WithdrawPage() {
             </div>
 
             {selectedStream && (
-              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                <h3 className="font-semibold mb-3">Stream Details</h3>
+              <div className="bg-blue-900/20 p-4 rounded-lg border border-blue-800/50">
+                <h3 className="font-semibold mb-3 text-slate-100">Stream Details</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="text-gray-600">Total Amount</p>
-                    <p className="font-semibold">
+                    <p className="text-slate-400">Total Amount</p>
+                    <p className="font-semibold text-slate-100">
                       {(
                         BigInt(selectedStream.totalAmount) / BigInt(10 ** 18)
                       ).toString()}{" "}
@@ -124,8 +124,8 @@ export default function WithdrawPage() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-gray-600">Withdrawn</p>
-                    <p className="font-semibold">
+                    <p className="text-slate-400">Withdrawn</p>
+                    <p className="font-semibold text-slate-100">
                       {(
                         BigInt(selectedStream.withdrawn) / BigInt(10 ** 18)
                       ).toString()}{" "}
@@ -133,8 +133,8 @@ export default function WithdrawPage() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-gray-600">Escrowed</p>
-                    <p className="font-semibold text-purple-600">
+                    <p className="text-slate-400">Escrowed</p>
+                    <p className="font-semibold text-purple-400">
                       {(
                         BigInt(selectedStream.escrowed) / BigInt(10 ** 18)
                       ).toString()}{" "}
@@ -146,7 +146,7 @@ export default function WithdrawPage() {
             )}
 
             <div>
-              <label className="block text-sm font-medium mb-2">
+              <label className="text-sm font-medium mb-2 text-slate-200">
                 Amount to Withdraw
               </label>
               <input

@@ -91,21 +91,21 @@ export default function DepositPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-3xl font-bold mb-8">Deposit Tokens</h1>
+      <h1 className="text-3xl font-bold mb-8 text-slate-100">Deposit Tokens</h1>
 
       <Card>
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-600">{error}</p>
+            <div className="p-4 bg-red-900/20 border border-red-800/50 rounded-lg">
+              <p className="text-sm text-red-300">{error}</p>
             </div>
           )}
 
           {success && (
-            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-sm text-green-600">{success}</p>
+            <div className="p-4 bg-green-900/20 border border-green-800/50 rounded-lg">
+              <p className="text-sm text-green-300">{success}</p>
               {transactionHash && (
-                <p className="text-xs text-gray-600 mt-2 font-mono break-all">
+                <p className="text-xs text-slate-400 mt-2 font-mono break-all">
                   Tx: {transactionHash}
                 </p>
               )}
@@ -119,7 +119,7 @@ export default function DepositPage() {
           />
 
           <div>
-            <label className="block text-sm font-medium mb-2">
+            <label className="block text-sm font-medium mb-2 text-slate-200">
               Amount to Deposit
             </label>
             <input
@@ -131,14 +131,14 @@ export default function DepositPage() {
               step="0.001"
               className="input-base"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-slate-400 mt-1">
               Enter the amount of tokens you want to deposit
             </p>
           </div>
 
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-            <h3 className="font-semibold mb-2">How it works:</h3>
-            <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside">
+          <div className="bg-blue-900/20 p-4 rounded-lg border border-blue-800/50">
+            <h3 className="font-semibold mb-2 text-slate-100">How it works:</h3>
+            <ul className="text-sm text-slate-300 space-y-1 list-disc list-inside">
               <li>Select a token from the dropdown</li>
               <li>Specify the amount you want to deposit</li>
               <li>Click &quot;Approve & Deposit Tokens&quot;</li>
@@ -147,8 +147,8 @@ export default function DepositPage() {
             </ul>
           </div>
 
-          <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
-            <p className="text-sm text-amber-700">
+          <div className="bg-amber-900/20 p-4 rounded-lg border border-amber-800/50">
+            <p className="text-sm text-amber-300">
               <strong>Supported Tokens:</strong> Any ERC20 token on Sepolia testnet
               (SOL-wrapped, ETH, BTC-wrapped, USDC, DAI, etc.)
             </p>

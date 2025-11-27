@@ -10,7 +10,7 @@ export default function EmployeeStreamsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-lg text-gray-600">Loading streams...</div>
+        <div className="text-lg text-slate-400">Loading streams...</div>
       </div>
     );
   }
@@ -18,18 +18,18 @@ export default function EmployeeStreamsPage() {
   if (error) {
     return (
       <Card>
-        <div className="text-red-600">Error: {error}</div>
+        <div className="text-red-400">Error: {error}</div>
       </Card>
     );
   }
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-8">My Salary Streams</h1>
+      <h1 className="text-3xl font-bold mb-8 text-slate-100">My Salary Streams</h1>
 
       {!isEmployee && (
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-700">
+        <div className="mb-6 p-4 bg-blue-900/20 border border-blue-800/50 rounded-lg">
+          <p className="text-sm text-blue-300">
             💡 You don't have an employee role. Data shown below is for viewing only.
           </p>
         </div>
@@ -37,7 +37,7 @@ export default function EmployeeStreamsPage() {
 
       {streams.length === 0 ? (
         <Card>
-          <p className="text-center text-gray-600 py-8">
+          <p className="text-center text-slate-400 py-8">
             You have no active streams. Contact your company to create one.
           </p>
         </Card>
@@ -47,10 +47,10 @@ export default function EmployeeStreamsPage() {
             <Card key={stream.streamId}>
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <h3 className="text-xl font-semibold">
+                  <h3 className="text-xl font-semibold text-slate-100">
                     Stream #{stream.streamId}
                   </h3>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-slate-400">
                     Company: {stream.company.slice(0, 6)}...
                     {stream.company.slice(-4)}
                   </p>
@@ -58,10 +58,10 @@ export default function EmployeeStreamsPage() {
                 <span
                   className={`px-3 py-1 rounded-full text-sm font-medium ${
                     stream.cancelled
-                      ? "bg-red-100 text-red-700"
+                      ? "bg-red-900/30 text-red-300"
                       : stream.paused
-                        ? "bg-yellow-100 text-yellow-700"
-                        : "bg-green-100 text-green-700"
+                        ? "bg-yellow-900/30 text-yellow-300"
+                        : "bg-green-900/30 text-green-300"
                   }`}
                 >
                   {stream.cancelled ? "Cancelled" : stream.paused ? "Paused" : "Active"}
@@ -70,26 +70,26 @@ export default function EmployeeStreamsPage() {
 
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
                 <div>
-                  <div className="text-sm text-gray-600">Total Amount</div>
-                  <div className="text-lg font-semibold">
+                  <div className="text-sm text-slate-400">Total Amount</div>
+                  <div className="text-lg font-semibold text-slate-100">
                     {(BigInt(stream.totalAmount) / BigInt(10 ** 18)).toString()} Tokens
                   </div>
                 </div>
                 <div>
-                  <div className="text-sm text-gray-600">Withdrawn</div>
-                  <div className="text-lg font-semibold">
+                  <div className="text-sm text-slate-400">Withdrawn</div>
+                  <div className="text-lg font-semibold text-slate-100">
                     {(BigInt(stream.withdrawn) / BigInt(10 ** 18)).toString()} Tokens
                   </div>
                 </div>
                 <div>
-                  <div className="text-sm text-gray-600">Escrowed</div>
-                  <div className="text-lg font-semibold text-purple-600">
+                  <div className="text-sm text-slate-400">Escrowed</div>
+                  <div className="text-lg font-semibold text-purple-400">
                     {(BigInt(stream.escrowed) / BigInt(10 ** 18)).toString()} Tokens
                   </div>
                 </div>
               </div>
 
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-slate-400">
                 <p>Start: {new Date(stream.startTime * 1000).toLocaleDateString()}</p>
                 <p>End: {new Date(stream.stopTime * 1000).toLocaleDateString()}</p>
               </div>
