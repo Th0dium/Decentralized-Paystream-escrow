@@ -270,25 +270,9 @@ contract Paystream is ReentrancyGuard, AccessControl {
         require(duration >= MIN_PAYMENT_DURATION, "duration too short");
         require(duration <= MAX_PAYMENT_DURATION, "duration too long");
 
-        // Calculate platform fee
-        uint256 feeAmount = 0;
-        if (platformFeeBps > 0 && feeRecipient != address(0)) {
-            feeAmount = (totalAmount * platformFeeBps) / 10000;
-        }
-
-        require(totalAmount >= feeAmount, "amount less than fee");
-        uint256 streamAmount = totalAmount - feeAmount;
-        require(
-            streamAmount >= MIN_PAYMENT_AMOUNT,
-            "amount after fee too small"
-        );
-
         // Transfer funds
         IERC20 erc20 = IERC20(token);
-        if (feeAmount > 0) {
-            erc20.safeTransferFrom(msg.sender, feeRecipient, feeAmount);
-        }
-        erc20.safeTransferFrom(msg.sender, address(this), streamAmount);
+        erc20.safeTransferFrom(msg.sender, address(this), totalAmount);
 
         // Create payment
         uint256 paymentId = _nextPaymentId++;
@@ -296,7 +280,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
             company: msg.sender,
             employee: employee,
             token: erc20,
-            totalAmount: streamAmount,
+            totalAmount: totalAmount,
             withdrawn: 0,
             startTime: startTime,
             stopTime: stopTime,
@@ -318,7 +302,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
             totalAmount,
             startTime,
             stopTime,
-            feeAmount
+            0
         );
         return paymentId;
     }
@@ -477,7 +461,8 @@ contract Paystream is ReentrancyGuard, AccessControl {
         }
 
         // Transfer escrow funds
-        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        IERC20 erc20 = IERC20(token);
+        erc20.safeTransferFrom(msg.sender, address(this), amount);
 
         // Create escrow
         uint256 escrowId = _nextEscrowId++;
@@ -485,7 +470,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
             paymentId: paymentId,
             company: msg.sender,
             employee: employee,
-            token: IERC20(token),
+            token: erc20,
             amount: amount,
             descriptionHash: descriptionHash,
             status: EscrowStatus.PENDING,
