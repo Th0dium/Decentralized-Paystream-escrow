@@ -1,67 +1,141 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/hooks";
+
+interface MenuSection {
+  title?: string;
+  items: MenuItem[];
+}
+
+interface MenuItem {
+  href: string;
+  label: string;
+  show: boolean;
+}
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { isCompany, isEmployee, isAuditor } = useAuth();
+  const router = useRouter();
+  const { isCompany, isEmployee, isAuditor, logout } = useAuth();
 
-  const menuItems = [
-    { href: "/dashboard", label: "Overview", show: true },
+  const handleLogout = () => {
+    logout();
+    router.push("/login");
+  };
+
+  const menuSections: MenuSection[] = [
     {
-      href: "/dashboard/employee/streams",
-      label: "My Streams",
-      show: isEmployee,
+      items: [
+        { href: "/dashboard", label: "Overview", show: true },
+      ],
     },
     {
-      href: "/dashboard/employee/withdraw",
-      label: "Withdraw",
-      show: isEmployee,
+      title: "Employee",
+      items: [
+        {
+          href: "/dashboard/employee",
+          label: "Employee Hub",
+          show: true,
+        },
+        {
+          href: "/dashboard/employee/streams",
+          label: "My Streams",
+          show: true,
+        },
+        {
+          href: "/dashboard/employee/withdraw",
+          label: "Withdraw",
+          show: true,
+        },
+        {
+          href: "/dashboard/employee/milestones",
+          label: "My Milestones",
+          show: true,
+        },
+      ],
     },
     {
-      href: "/dashboard/employee/milestones",
-      label: "My Milestones",
-      show: isEmployee,
+      title: "Company",
+      items: [
+        {
+          href: "/dashboard/company",
+          label: "Company Hub",
+          show: true,
+        },
+        {
+          href: "/dashboard/company/create-stream",
+          label: "Create Stream",
+          show: true,
+        },
+        {
+          href: "/dashboard/company/streams",
+          label: "Manage Streams",
+          show: true,
+        },
+      ],
     },
     {
-      href: "/dashboard/company/create-stream",
-      label: "Create Stream",
-      show: true, // Anyone can create a stream
-    },
-    {
-      href: "/dashboard/company/streams",
-      label: "Manage Streams",
-      show: isCompany,
-    },
-    {
-      href: "/dashboard/auditor/milestones",
-      label: "Review Milestones",
-      show: isAuditor,
+      title: "Auditor",
+      items: [
+        {
+          href: "/dashboard/auditor",
+          label: "Auditor Hub",
+          show: true,
+        },
+        {
+          href: "/dashboard/auditor/milestones",
+          label: "Review Milestones",
+          show: true,
+        },
+      ],
     },
   ];
 
   return (
-    <aside className="w-64 bg-white shadow-md overflow-y-auto">
-      <nav className="p-4 space-y-2">
-        {menuItems.map(
-          (item) =>
-            item.show && (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`block px-4 py-2 rounded-lg transition-colors ${
-                  pathname === item.href
-                    ? "bg-blue-500 text-white"
-                    : "text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                {item.label}
-              </Link>
-            )
-        )}
+    <aside className="w-64 bg-white shadow-md overflow-y-auto flex flex-col">
+      <nav className="p-4 flex-1">
+        {menuSections.map((section, idx) => {
+          const visibleItems = section.items.filter(item => item.show);
+          if (visibleItems.length === 0) return null;
+
+          return (
+            <div key={idx} className={section.title ? "mb-6" : "mb-2"}>
+              {section.title && (
+                <h3 className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  {section.title}
+                </h3>
+              )}
+              <div className="space-y-2">
+                {visibleItems.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`block px-4 py-2 rounded-lg transition-colors ${
+                      pathname === item.href
+                        ? "bg-blue-500 text-white"
+                        : "text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </nav>
+
+      {/* Logout Button */}
+      <div className="p-4 border-t border-gray-200">
+        <button
+          onClick={handleLogout}
+          className="w-full px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 font-medium rounded-lg transition-colors"
+        >
+          Logout
+        </button>
+      </div>
     </aside>
   );
 }

@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
 import { useAuth } from "@/lib/hooks";
 import { useNetworkSwitch } from "@/lib/use-network-switch";
@@ -24,18 +23,14 @@ export default function DashboardLayout({
 
   if (!isHydrated || !isAuthenticated) {
     return (
-      <>
-        <Header />
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-lg text-gray-600">Loading...</div>
-        </div>
-      </>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-lg text-gray-600">Loading...</div>
+      </div>
     );
   }
 
   return (
     <>
-      <Header />
       {/* Network Warning */}
       {!isOnCorrectNetwork && (
         <div className="bg-yellow-50 border-b-2 border-yellow-400 p-4">

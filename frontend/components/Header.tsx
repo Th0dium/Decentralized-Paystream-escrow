@@ -21,18 +21,13 @@ export default function Header() {
             Paystream
           </Link>
 
-          {isAuthenticated ? (
-            <div className="flex items-center gap-4">
-              <w3m-button />
-              <button
-                onClick={handleLogout}
-                className="btn-secondary text-sm"
-              >
-                Logout
-              </button>
-            </div>
-          ) : (
-            <w3m-button />
+          {isAuthenticated && (
+            <button
+              onClick={handleLogout}
+              className="btn-secondary text-sm"
+            >
+              Logout
+            </button>
           )}
         </div>
       </div>

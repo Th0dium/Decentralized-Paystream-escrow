@@ -7,7 +7,7 @@ import { useAuth, useEmployeeMilestones } from "@/lib/hooks";
 import { MilestoneStatus } from "@/lib/types";
 
 export default function MilestonesPage() {
-  const { walletAddress } = useAuth();
+  const { walletAddress, isEmployee } = useAuth();
   const { milestones, loading } = useEmployeeMilestones(walletAddress);
   const [isClaimingIndex, setIsClaimingIndex] = useState<number | null>(null);
 
@@ -50,6 +50,14 @@ export default function MilestonesPage() {
   return (
     <div>
       <h1 className="text-3xl font-bold mb-8">My Milestones</h1>
+
+      {!isEmployee && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-700">
+            💡 You don't have an employee role. Data shown below is for viewing only.
+          </p>
+        </div>
+      )}
 
       {milestones.length === 0 ? (
         <Card>
