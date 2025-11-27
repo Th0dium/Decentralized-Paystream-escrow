@@ -46,18 +46,18 @@ export default function AuditorMilestonesPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-lg text-gray-600">Loading milestones...</div>
+        <div className="text-lg text-slate-400">Loading milestones...</div>
       </div>
     );
   }
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-8">Review Milestones</h1>
+      <h1 className="text-3xl font-bold mb-8 text-slate-100">Review Milestones</h1>
 
       {!isAuditor && (
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-700">
+        <div className="mb-6 p-4 bg-blue-900/20 border border-blue-800/50 rounded-lg">
+          <p className="text-sm text-blue-300">
             💡 You don't have an auditor role. Data shown below is for viewing only.
           </p>
         </div>
@@ -65,13 +65,13 @@ export default function AuditorMilestonesPage() {
 
       {/* Pending Section */}
       <div className="mb-12">
-        <h2 className="text-2xl font-semibold mb-6">
+        <h2 className="text-2xl font-semibold mb-6 text-slate-100">
           Pending Review ({pendingMilestones.length})
         </h2>
 
         {pendingMilestones.length === 0 ? (
           <Card>
-            <p className="text-center text-gray-600 py-8">
+            <p className="text-center text-slate-400 py-8">
               No pending milestones to review.
             </p>
           </Card>
@@ -88,24 +88,24 @@ export default function AuditorMilestonesPage() {
               >
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h3 className="text-xl font-semibold">
+                    <h3 className="text-xl font-semibold text-slate-100">
                       Milestone #{milestone.milestoneId}
                     </h3>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-slate-400">
                       Stream #{milestone.streamId} • Submitter:{" "}
                       {milestone.submitter.slice(0, 6)}...
                       {milestone.submitter.slice(-4)}
                     </p>
                   </div>
-                  <span className="px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-700">
+                  <span className="px-3 py-1 rounded-full text-sm font-medium bg-yellow-900/30 text-yellow-300">
                     {milestone.status}
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
                   <div>
-                    <div className="text-sm text-gray-600">Amount</div>
-                    <div className="text-lg font-semibold">
+                    <div className="text-sm text-slate-400">Amount</div>
+                    <div className="text-lg font-semibold text-slate-100">
                       {(
                         BigInt(milestone.amount) / BigInt(10 ** 18)
                       ).toString()}{" "}
@@ -113,8 +113,8 @@ export default function AuditorMilestonesPage() {
                     </div>
                   </div>
                   <div>
-                    <div className="text-sm text-gray-600">Submitted</div>
-                    <div className="text-sm font-semibold">
+                    <div className="text-sm text-slate-400">Submitted</div>
+                    <div className="text-sm font-semibold text-slate-100">
                       {new Date(
                         milestone.createdAt * 1000
                       ).toLocaleDateString()}
@@ -123,16 +123,16 @@ export default function AuditorMilestonesPage() {
                 </div>
 
                 {milestone.ipfsHash && (
-                  <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <p className="text-sm font-semibold mb-2">Evidence (IPFS)</p>
-                    <p className="text-xs font-mono break-all text-gray-600">
+                  <div className="mb-6 p-4 bg-slate-700/50 rounded-lg border border-slate-600">
+                    <p className="text-sm font-semibold mb-2 text-slate-100">Evidence (IPFS)</p>
+                    <p className="text-xs font-mono break-all text-slate-400">
                       {milestone.ipfsHash}
                     </p>
                     <a
                       href={`https://gateway.pinata.cloud/ipfs/${milestone.ipfsHash}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-2 inline-block text-xs text-blue-600 hover:underline"
+                      className="mt-2 inline-block text-xs text-blue-400 hover:underline"
                     >
                       View on IPFS →
                     </a>
@@ -182,7 +182,7 @@ export default function AuditorMilestonesPage() {
       {/* Reviewed Section */}
       {reviewedMilestones.length > 0 && (
         <div>
-          <h2 className="text-2xl font-semibold mb-6">
+          <h2 className="text-2xl font-semibold mb-6 text-slate-100">
             Review History ({reviewedMilestones.length})
           </h2>
 
@@ -191,10 +191,10 @@ export default function AuditorMilestonesPage() {
               <Card key={milestone.milestoneId} className="opacity-75">
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h3 className="text-lg font-semibold">
+                    <h3 className="text-lg font-semibold text-slate-100">
                       Milestone #{milestone.milestoneId}
                     </h3>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-slate-400">
                       Stream #{milestone.streamId} • Submitter:{" "}
                       {milestone.submitter.slice(0, 6)}...
                       {milestone.submitter.slice(-4)}
@@ -203,8 +203,8 @@ export default function AuditorMilestonesPage() {
                   <span
                     className={`px-3 py-1 rounded-full text-sm font-medium ${
                       milestone.status === MilestoneStatus.APPROVED
-                        ? "bg-green-100 text-green-700"
-                        : "bg-red-100 text-red-700"
+                        ? "bg-green-900/30 text-green-300"
+                        : "bg-red-900/30 text-red-300"
                     }`}
                   >
                     {milestone.status}
@@ -213,8 +213,8 @@ export default function AuditorMilestonesPage() {
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                   <div>
-                    <p className="text-gray-600">Amount</p>
-                    <p className="font-semibold">
+                    <p className="text-slate-400">Amount</p>
+                    <p className="font-semibold text-slate-100">
                       {(
                         BigInt(milestone.amount) / BigInt(10 ** 18)
                       ).toString()}{" "}
@@ -222,8 +222,8 @@ export default function AuditorMilestonesPage() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-gray-600">Submitted</p>
-                    <p className="font-semibold">
+                    <p className="text-slate-400">Submitted</p>
+                    <p className="font-semibold text-slate-100">
                       {new Date(
                         milestone.createdAt * 1000
                       ).toLocaleDateString()}
@@ -231,8 +231,8 @@ export default function AuditorMilestonesPage() {
                   </div>
                   {milestone.approvedAt && (
                     <div>
-                      <p className="text-gray-600">Reviewed</p>
-                      <p className="font-semibold">
+                      <p className="text-slate-400">Reviewed</p>
+                      <p className="font-semibold text-slate-100">
                         {new Date(
                           milestone.approvedAt * 1000
                         ).toLocaleDateString()}

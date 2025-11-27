@@ -2,6 +2,7 @@
 
 import "./globals.css";
 import { AppWalletProvider } from "@/lib/wallet-provider";
+import { DarkModeProvider } from "@/lib/dark-mode-provider";
 
 export default function RootLayout({
   children,
@@ -11,9 +12,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <AppWalletProvider>
-          {children}
-        </AppWalletProvider>
+        <DarkModeProvider>
+          <AppWalletProvider>
+            {children}
+          </AppWalletProvider>
+        </DarkModeProvider>
       </body>
     </html>
   );

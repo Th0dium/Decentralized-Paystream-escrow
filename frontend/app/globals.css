@@ -12,14 +12,20 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Dark mode as default */
+html {
+  color-scheme: dark;
+}
+
 body {
-  background-color: #f9fafb;
-  color: #111827;
+  background-color: #0f172a;
+  color: #f1f5f9;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 @layer components {
@@ -28,7 +34,7 @@ body {
   }
 
   .btn-secondary {
-    @apply px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors font-medium;
+    @apply px-4 py-2 bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 transition-colors font-medium;
   }
 
   .btn-danger {
@@ -40,10 +46,10 @@ body {
   }
 
   .card {
-    @apply bg-white rounded-lg shadow-md p-6 border border-gray-200;
+    @apply bg-slate-800 rounded-lg shadow-md p-6 border border-slate-700;
   }
 
   .input-base {
-    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+    @apply w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
   }
 }
