@@ -29,66 +29,9 @@ export default function Sidebar() {
     {
       items: [
         { href: "/dashboard", label: "Overview", show: true },
-      ],
-    },
-    {
-      title: "Employee",
-      items: [
-        {
-          href: "/dashboard/employee",
-          label: "Employee Hub",
-          show: true,
-        },
-        {
-          href: "/dashboard/employee/streams",
-          label: "My Streams",
-          show: true,
-        },
-        {
-          href: "/dashboard/employee/withdraw",
-          label: "Withdraw",
-          show: true,
-        },
-        {
-          href: "/dashboard/employee/milestones",
-          label: "My Milestones",
-          show: true,
-        },
-      ],
-    },
-    {
-      title: "Company",
-      items: [
-        {
-          href: "/dashboard/company",
-          label: "Company Hub",
-          show: true,
-        },
-        {
-          href: "/dashboard/company/create-stream",
-          label: "Create Stream",
-          show: true,
-        },
-        {
-          href: "/dashboard/company/streams",
-          label: "Manage Streams",
-          show: true,
-        },
-      ],
-    },
-    {
-      title: "Auditor",
-      items: [
-        {
-          href: "/dashboard/auditor",
-          label: "Auditor Hub",
-          show: true,
-        },
-        {
-          href: "/dashboard/auditor/milestones",
-          label: "Review Milestones",
-          show: true,
-        },
+        { href: "/dashboard/employee", label: "Employee Hub", show: true },
+        { href: "/dashboard/company", label: "Company Hub", show: true },
+        { href: "/dashboard/auditor", label: "Auditor Hub", show: true },
       ],
     },
   ];
