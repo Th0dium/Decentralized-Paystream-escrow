@@ -6,7 +6,7 @@ import { Button } from "@/components/Button";
 import { useAuth, useEmployeeStreams } from "@/lib/hooks";
 
 export default function WithdrawPage() {
-  const { walletAddress } = useAuth();
+  const { walletAddress, isEmployee } = useAuth();
   const { streams, loading } = useEmployeeStreams(walletAddress);
   const [selectedStreamId, setSelectedStreamId] = useState<number | null>(null);
   const [amount, setAmount] = useState("");
@@ -54,6 +54,14 @@ export default function WithdrawPage() {
   return (
     <div className="max-w-2xl">
       <h1 className="text-3xl font-bold mb-8">Withdraw Funds</h1>
+
+      {!isEmployee && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-700">
+            💡 You don't have an employee role. Data shown below is for viewing only.
+          </p>
+        </div>
+      )}
 
       {activeStreams.length === 0 ? (
         <Card>

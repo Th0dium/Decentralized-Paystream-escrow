@@ -4,7 +4,7 @@ import { Card } from "@/components/Card";
 import { useAuth, useEmployeeStreams } from "@/lib/hooks";
 
 export default function EmployeeStreamsPage() {
-  const { walletAddress } = useAuth();
+  const { walletAddress, isEmployee } = useAuth();
   const { streams, loading, error } = useEmployeeStreams(walletAddress);
 
   if (loading) {
@@ -26,6 +26,14 @@ export default function EmployeeStreamsPage() {
   return (
     <div>
       <h1 className="text-3xl font-bold mb-8">My Salary Streams</h1>
+
+      {!isEmployee && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-700">
+            💡 You don't have an employee role. Data shown below is for viewing only.
+          </p>
+        </div>
+      )}
 
       {streams.length === 0 ? (
         <Card>

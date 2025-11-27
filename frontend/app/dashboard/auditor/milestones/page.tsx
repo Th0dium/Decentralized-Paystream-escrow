@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
-import { usePendingMilestones } from "@/lib/hooks";
+import { useAuth, usePendingMilestones } from "@/lib/hooks";
 import { MilestoneStatus } from "@/lib/types";
 
 export default function AuditorMilestonesPage() {
+  const { isAuditor } = useAuth();
   const { milestones, loading, refetch } = usePendingMilestones();
   const [selectedMilestoneId] = useState<number | null>(
     null
@@ -53,6 +54,14 @@ export default function AuditorMilestonesPage() {
   return (
     <div>
       <h1 className="text-3xl font-bold mb-8">Review Milestones</h1>
+
+      {!isAuditor && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-700">
+            💡 You don't have an auditor role. Data shown below is for viewing only.
+          </p>
+        </div>
+      )}
 
       {/* Pending Section */}
       <div className="mb-12">

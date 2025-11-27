@@ -6,14 +6,24 @@ import { Button } from "@/components/Button";
 import { useAuth, useCompanyStreams } from "@/lib/hooks";
 
 export default function CompanyStreamsPage() {
-  const { walletAddress } = useAuth();
-  const { streams, loading, error } = useCompanyStreams(walletAddress);
+  const { walletAddress, isCompany } = useAuth();
+  const { streams, loading, error, refetch } = useCompanyStreams(walletAddress);
+  const [isRefetching, setIsRefetching] = useState(false);
   const [actionStreamId, setActionStreamId] = useState<number | null>(null);
   const [actionType, setActionType] = useState<
     "pause" | "resume" | "cancel" | null
   >(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  const handleRefresh = async () => {
+    setIsRefetching(true);
+    try {
+      await refetch();
+    } finally {
+      setIsRefetching(false);
+    }
+  };
 
   const handleStreamAction = async (
     streamId: number,
@@ -54,7 +64,24 @@ export default function CompanyStreamsPage() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-8">Manage Salary Streams</h1>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Manage Salary Streams</h1>
+        <Button
+          onClick={handleRefresh}
+          variant="secondary"
+          loading={isRefetching}
+        >
+          Refresh
+        </Button>
+      </div>
+
+      {!isCompany && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-700">
+            💡 You don't have a company role. Data shown below is for viewing only.
+          </p>
+        </div>
+      )}
 
       {actionError && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -83,13 +110,12 @@ export default function CompanyStreamsPage() {
                   </p>
                 </div>
                 <span
-                  className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    stream.cancelled
+                  className={`px-3 py-1 rounded-full text-sm font-medium ${stream.cancelled
                       ? "bg-red-100 text-red-700"
                       : stream.paused
                         ? "bg-yellow-100 text-yellow-700"
                         : "bg-green-100 text-green-700"
-                  }`}
+                    }`}
                 >
                   {stream.cancelled
                     ? "Cancelled"
