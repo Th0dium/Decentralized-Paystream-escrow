@@ -3,12 +3,17 @@
 import { useState } from "react";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
-import { useAuth, useCompanyStreams } from "@/lib/hooks";
+import { useAuth } from "@/lib/hooks";
+import { useMyPayments } from "@/lib/hooks/useMyPayments";
+import { formatUnits } from "viem";
+import { pauseStream, resumeStream, cancelStream } from "@/lib/contract-interaction";
+
+const ITEMS_PER_PAGE = 10;
 
 export default function CompanyStreamsPage() {
   const { walletAddress, isCompany } = useAuth();
-  const { streams, loading, error, refetch } = useCompanyStreams(walletAddress);
-  const [isRefetching, setIsRefetching] = useState(false);
+  const { asCompany: streams, isLoading: loading, error, refetch } = useMyPayments(walletAddress as any);
+  const [currentPage, setCurrentPage] = useState(1);
   const [actionStreamId, setActionStreamId] = useState<number | null>(null);
   const [actionType, setActionType] = useState<
     "pause" | "resume" | "cancel" | null
@@ -16,13 +21,14 @@ export default function CompanyStreamsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  // Client-side pagination
+  const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIdx = startIdx + ITEMS_PER_PAGE;
+  const paginatedStreams = streams.slice(startIdx, endIdx);
+  const totalPages = Math.ceil(streams.length / ITEMS_PER_PAGE);
+
   const handleRefresh = async () => {
-    setIsRefetching(true);
-    try {
-      await refetch();
-    } finally {
-      setIsRefetching(false);
-    }
+    await refetch();
   };
 
   const handleStreamAction = async (
@@ -35,8 +41,25 @@ export default function CompanyStreamsPage() {
     setIsSubmitting(true);
 
     try {
-      // TODO: Call smart contract functions
-      console.log(`Performing ${type} action on stream ${streamId}`);
+      const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
+      if (!contractAddress) throw new Error("Contract address not configured");
+
+      const streamIdStr = streamId.toString();
+
+      switch (type) {
+        case "pause":
+          await pauseStream(contractAddress as any, streamIdStr);
+          break;
+        case "resume":
+          await resumeStream(contractAddress as any, streamIdStr);
+          break;
+        case "cancel":
+          await cancelStream(contractAddress as any, streamIdStr);
+          break;
+      }
+
+      // Refetch after action
+      setTimeout(() => window.location.reload(), 2000);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Action failed");
     } finally {
@@ -69,7 +92,6 @@ export default function CompanyStreamsPage() {
         <Button
           onClick={handleRefresh}
           variant="secondary"
-          loading={isRefetching}
         >
           Refresh
         </Button>
@@ -96,125 +118,139 @@ export default function CompanyStreamsPage() {
           </p>
         </Card>
       ) : (
-        <div className="grid gap-6">
-          {streams.map((stream) => (
-            <Card key={stream.streamId}>
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-xl font-semibold text-slate-100">
-                    Stream #{stream.streamId}
-                  </h3>
-                  <p className="text-sm text-slate-400">
-                    Employee: {stream.employee.slice(0, 6)}...
-                    {stream.employee.slice(-4)}
-                  </p>
-                </div>
-                <span
-                  className={`px-3 py-1 rounded-full text-sm font-medium ${stream.cancelled
-                      ? "bg-red-900/30 text-red-300"
-                      : stream.paused
-                        ? "bg-yellow-900/30 text-yellow-300"
-                        : "bg-green-900/30 text-green-300"
-                    }`}
-                >
-                  {stream.cancelled
-                    ? "Cancelled"
-                    : stream.paused
-                      ? "Paused"
-                      : "Active"}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div>
-                  <div className="text-sm text-slate-400">Total Amount</div>
-                  <div className="text-lg font-semibold text-slate-100">
-                    {(BigInt(stream.totalAmount) / BigInt(10 ** 18)).toString()}{" "}
-                    Tokens
+        <>
+          <div className="space-y-4 mb-8">
+            {paginatedStreams.map((stream) => (
+              <Card key={stream.paymentId}>
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="text-xl font-semibold text-slate-100">
+                      Stream #{stream.paymentId}
+                    </h3>
+                    <p className="text-sm text-slate-400">
+                      Employee: {stream.employee.slice(0, 6)}...
+                      {stream.employee.slice(-4)}
+                    </p>
                   </div>
-                </div>
-                <div>
-                  <div className="text-sm text-slate-400">Withdrawn</div>
-                  <div className="text-lg font-semibold text-slate-100">
-                    {(BigInt(stream.withdrawn) / BigInt(10 ** 18)).toString()}{" "}
-                    Tokens
-                  </div>
-                </div>
-                <div>
-                  <div className="text-sm text-slate-400">Escrowed</div>
-                  <div className="text-lg font-semibold text-purple-400">
-                    {(BigInt(stream.escrowed) / BigInt(10 ** 18)).toString()}{" "}
-                    Tokens
-                  </div>
-                </div>
-                <div>
-                  <div className="text-sm text-slate-400">Remaining</div>
-                  <div className="text-lg font-semibold text-blue-400">
-                    {(
-                      BigInt(stream.totalAmount) -
-                      BigInt(stream.withdrawn) -
-                      BigInt(stream.escrowed)
-                    )
-                      .toString()
-                      .padStart(18, "0")}
-                  </div>
-                </div>
-              </div>
-
-              <div className="text-sm text-slate-400 mb-6">
-                <p>Start: {new Date(stream.startTime * 1000).toLocaleDateString()}</p>
-                <p>End: {new Date(stream.stopTime * 1000).toLocaleDateString()}</p>
-              </div>
-
-              {!stream.cancelled && (
-                <div className="flex gap-3 flex-wrap">
-                  {!stream.paused ? (
-                    <Button
-                      onClick={() =>
-                        handleStreamAction(stream.streamId, "pause")
-                      }
-                      variant="secondary"
-                      loading={
-                        actionStreamId === stream.streamId &&
-                        actionType === "pause" &&
-                        isSubmitting
-                      }
-                    >
-                      Pause Stream
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={() =>
-                        handleStreamAction(stream.streamId, "resume")
-                      }
-                      variant="success"
-                      loading={
-                        actionStreamId === stream.streamId &&
-                        actionType === "resume" &&
-                        isSubmitting
-                      }
-                    >
-                      Resume Stream
-                    </Button>
-                  )}
-                  <Button
-                    onClick={() =>
-                      handleStreamAction(stream.streamId, "cancel")
-                    }
-                    variant="danger"
-                    loading={
-                      actionStreamId === stream.streamId &&
-                      actionType === "cancel" &&
-                      isSubmitting
-                    }
+                  <span
+                    className={`px-3 py-1 rounded-full text-sm font-medium ${stream.cancelled
+                        ? "bg-red-900/30 text-red-300"
+                        : stream.paused
+                          ? "bg-yellow-900/30 text-yellow-300"
+                          : "bg-green-900/30 text-green-300"
+                      }`}
                   >
-                    Cancel Stream
-                  </Button>
+                    {stream.cancelled
+                      ? "Cancelled"
+                      : stream.paused
+                        ? "Paused"
+                        : "Active"}
+                  </span>
                 </div>
-              )}
-            </Card>
-          ))}
-        </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  <div>
+                    <div className="text-sm text-slate-400">Stream Amount</div>
+                    <div className="text-lg font-semibold text-slate-100">
+                      {formatUnits(stream.streamAmount, 18)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-slate-400">Escrow Amount</div>
+                    <div className="text-lg font-semibold text-purple-400">
+                      {formatUnits(stream.escrowAmount, 18)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-slate-400">Withdrawn</div>
+                    <div className="text-lg font-semibold text-slate-100">
+                      {formatUnits(stream.withdrawn, 18)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-slate-400">Progress</div>
+                    <div className="text-lg font-semibold text-blue-400">{stream.progress}%</div>
+                  </div>
+                </div>
+
+                <div className="text-sm text-slate-400 mb-6">
+                  <p>Start: {new Date(Number(stream.startTime) * 1000).toLocaleDateString()}</p>
+                  <p>End: {new Date(Number(stream.stopTime) * 1000).toLocaleDateString()}</p>
+                </div>
+
+                {!stream.cancelled && (
+                  <div className="flex gap-3 flex-wrap">
+                    {!stream.paused ? (
+                      <Button
+                        onClick={() =>
+                          handleStreamAction(stream.paymentId, "pause")
+                        }
+                        variant="secondary"
+                        loading={
+                          actionStreamId === stream.paymentId &&
+                          actionType === "pause" &&
+                          isSubmitting
+                        }
+                      >
+                        Pause Stream
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() =>
+                          handleStreamAction(stream.paymentId, "resume")
+                        }
+                        variant="success"
+                        loading={
+                          actionStreamId === stream.paymentId &&
+                          actionType === "resume" &&
+                          isSubmitting
+                        }
+                      >
+                        Resume Stream
+                      </Button>
+                    )}
+                    <Button
+                      onClick={() =>
+                        handleStreamAction(stream.paymentId, "cancel")
+                      }
+                      variant="danger"
+                      loading={
+                        actionStreamId === stream.paymentId &&
+                        actionType === "cancel" &&
+                        isSubmitting
+                      }
+                    >
+                      Cancel Stream
+                    </Button>
+                  </div>
+                )}
+              </Card>
+            ))}
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex justify-center gap-2 mt-8">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <span className="px-4 py-2 text-slate-300">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

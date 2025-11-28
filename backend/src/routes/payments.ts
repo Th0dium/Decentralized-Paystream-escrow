@@ -1,15 +1,14 @@
 import { Router } from 'express'
 import {
-  getEmployeePayments,
-  getCompanyPayments,
   getPaymentDetails,
 } from '../controllers/paymentsController'
-import { authenticateToken } from '../middleware/auth'
 
 const router = Router()
 
-router.get('/employee/:walletAddress', getEmployeePayments)
-router.get('/company/:walletAddress', getCompanyPayments)
+// NOTE: Removed /employee/:walletAddress and /company/:walletAddress endpoints
+// Frontend now queries blockchain directly via useMyPayments hook
+// Keeps only getPaymentDetails for optional reference data
+
 router.get('/:paymentId', getPaymentDetails)
 
 export default router
