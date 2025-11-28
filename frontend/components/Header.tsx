@@ -9,7 +9,7 @@ export default function Header() {
   const { isAuthenticated, logout } = useAuth(); // Removed walletAddress from destructuring
 
   const handleLogout = () => {
-    disconnect();
+    logout();
     router.push("/");
   };
 

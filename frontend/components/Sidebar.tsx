@@ -18,7 +18,7 @@ interface MenuItem {
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { isCompany, isEmployee, isAuditor, logout } = useAuth();
+  const { logout } = useAuth();
 
   const handleLogout = () => {
     logout();

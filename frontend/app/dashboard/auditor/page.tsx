@@ -15,7 +15,7 @@ export default function AuditorHubPage() {
       {!isAuditor && (
         <div className="mb-6 p-4 bg-blue-900/20 border border-blue-800/50 rounded-lg">
           <p className="text-sm text-blue-300">
-            💡 You don't have an auditor role, but you can still view this section.
+            💡 You don&apos;t have an auditor role, but you can still view this section.
           </p>
         </div>
       )}
