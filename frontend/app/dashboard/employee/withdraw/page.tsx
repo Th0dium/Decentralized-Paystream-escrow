@@ -111,7 +111,7 @@ export default function WithdrawPage() {
                 {activeStreams.map((stream) => (
                   <option key={stream.paymentId} value={stream.paymentId}>
                     Stream #{stream.paymentId} (
-                    {formatUnits(stream.streamAmount, 18)} tokens)
+                    {formatUnits(stream.streamAmount, stream.tokenDecimals)} {stream.tokenSymbol})
                   </option>
                 ))}
               </select>
@@ -124,25 +124,25 @@ export default function WithdrawPage() {
                   <div>
                     <p className="text-slate-400">Total Stream Amount</p>
                     <p className="font-semibold text-slate-100">
-                      {formatUnits(selectedStream.streamAmount, 18)} tokens
+                      {formatUnits(selectedStream.streamAmount, selectedStream.tokenDecimals)} {selectedStream.tokenSymbol}
                     </p>
                   </div>
                   <div>
                     <p className="text-slate-400">Already Withdrawn</p>
                     <p className="font-semibold text-slate-100">
-                      {formatUnits(selectedStream.withdrawn, 18)} tokens
+                      {formatUnits(selectedStream.withdrawn, selectedStream.tokenDecimals)} {selectedStream.tokenSymbol}
                     </p>
                   </div>
                   <div>
                     <p className="text-slate-400">Available to Withdraw</p>
                     <p className="font-semibold text-green-400">
-                      {selectedStream.claimableAmount ? formatUnits(selectedStream.claimableAmount, 18) : "0"} tokens
+                      {selectedStream.claimableAmount ? formatUnits(selectedStream.claimableAmount, selectedStream.tokenDecimals) : "0"} {selectedStream.tokenSymbol}
                     </p>
                   </div>
                   <div>
                     <p className="text-slate-400">Escrowed (Milestones)</p>
                     <p className="font-semibold text-purple-400">
-                      {formatUnits(selectedStream.escrowAmount, 18)} tokens
+                      {formatUnits(selectedStream.escrowAmount, selectedStream.tokenDecimals)} {selectedStream.tokenSymbol}
                     </p>
                   </div>
                 </div>

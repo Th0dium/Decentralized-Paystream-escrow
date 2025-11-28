@@ -12,7 +12,7 @@ const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
 
 export default function MilestonesPage() {
   const { walletAddress, isEmployee } = useAuth();
-  const { milestones, isLoading } = useMyMilestones(walletAddress as any, 'employee');
+  const { milestones, isLoading, refetch } = useMyMilestones(walletAddress as any, 'employee');
   const [isClaimingId, setIsClaimingId] = useState<number | null>(null);
 
   const handleClaimMilestone = async (milestoneId: number) => {
@@ -24,7 +24,7 @@ export default function MilestonesPage() {
       await claimMilestone(CONTRACT_ADDRESS as any, milestoneId.toString());
       
       // Auto-refresh handled by hook or page reload
-      setTimeout(() => window.location.reload(), 2000);
+      await refetch();
     } catch (error) {
       console.error("Failed to claim milestone:", error);
       alert("Failed to claim: " + (error instanceof Error ? error.message : "Unknown error"));
@@ -111,7 +111,7 @@ export default function MilestonesPage() {
                 <div>
                   <div className="text-sm text-slate-400">Amount</div>
                   <div className="text-lg font-semibold text-slate-100">
-                    {formatUnits(milestone.amount, 18)} tokens
+                    {formatUnits(milestone.amount, milestone.tokenDecimals)} {milestone.tokenSymbol}
                   </div>
                 </div>
                 <div>
