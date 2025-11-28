@@ -28,7 +28,9 @@ model Payment {
   company             String
   employee            String
   token               String
-  totalAmount         String // Store as string (big numbers)
+  streamAmount        String   @default("0") // Amount for continuous vesting
+  escrowAmount        String   @default("0") // Amount locked for milestones
+  totalAmount         String   // streamAmount + escrowAmount (deprecated, kept for migration)
   startTime           BigInt
   stopTime            BigInt
   lastWithdrawTime    BigInt?
@@ -44,6 +46,7 @@ model Payment {
 
   @@index([company])
   @@index([employee])
+  @@index([paused])
 }
 
 model Escrow {
@@ -54,7 +57,7 @@ model Escrow {
   employee    String
   token       String
   amount      String
-  description String
+  description String   // IPFS hash or description
   status      String   @default("PENDING") // PENDING, APPROVED, REJECTED, CLAIMED, CANCELLED
   createdAt   DateTime @default(now())
   approvedAt  DateTime?
@@ -67,6 +70,7 @@ model Escrow {
   @@index([company])
   @@index([employee])
   @@index([status])
+  @@index([status, createdAt]) // For sorted queries
 }
 
 model ContractEvent {

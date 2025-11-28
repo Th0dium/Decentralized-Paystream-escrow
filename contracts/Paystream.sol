@@ -8,172 +8,139 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title Paystream
- * @dev Unified contract with 2 separate protocols:
- * - Payment Protocol: Time-based streaming payments.
- * - Escrow Protocol: Milestone-based payments requiring auditor approval.
+ * @dev A unified contract for streaming payments with optional milestone-based escrow.
+ * Users specify:
+ * - streamAmount: Amount to stream continuously
+ * - escrowAmount: Initial escrow amount locked for milestones
  *
- * @notice This contract manages the on-chain logic for payment streams and escrows.
- * The roles of "Company", "Employee", and "Auditor" are defined contextually per payment/escrow.
- * An off-chain backend service is expected to manage user profiles and persistent roles.
- * - A user becomes a "Company" by creating a payment stream.
- * - A user becomes an "Employee" by being the recipient of a stream or escrow.
- * - A user becomes an "Auditor" by being assigned to a stream or escrow for oversight.
+ * When employee withdraws from stream, the escrowAmount stays locked.
+ * Employee submits milestones to claim from escrowed funds.
+ *
+ * Administrative functions are controlled by the DEFAULT_ADMIN_ROLE.
  */
 contract Paystream is ReentrancyGuard, AccessControl {
     using SafeERC20 for IERC20;
 
     // ============ Enums ============
-    enum EscrowStatus {
-        PENDING, // Created, waiting for approval
-        APPROVED, // Auditor approved
-        REJECTED, // Auditor rejected
-        CLAIMED, // Employee claimed
-        CANCELLED // Company cancelled
+    enum MilestoneStatus {
+        PENDING,
+        APPROVED,
+        REJECTED,
+        CLAIMED
     }
 
     // ============ Structs ============
-
-    /**
-     * @notice Payment Protocol: Pure streaming payment
-     * No escrow logic - 100% withdraw as it unlocks
-     */
-    struct Payment {
+    struct Stream {
         address company;
         address employee;
         IERC20 token;
-        uint256 totalAmount; // Total funded by company
-        uint256 withdrawn; // Total withdrawn
-        uint64 startTime; // Stream start
-        uint64 stopTime; // Stream end
-        uint64 lastWithdrawTime; // Last withdrawal timestamp
-        uint64 totalPausedDuration; // Cumulative pause duration
-        uint64 pausedAt; // Current pause start (0 if not paused)
-        bool paused; // Stream paused by company
-        bool cancelled; // Stream cancelled
+        uint256 streamAmount; // Amount for continuous streaming
+        uint256 escrowAmount; // Initial escrow amount locked for milestones
+        uint64 startTime;
+        uint64 stopTime;
+        uint64 lastWithdrawTime;
+        uint256 withdrawn; // Total withdrawn from stream
+        uint256 escrowed; // Current amount locked in escrow (starts at escrowAmount)
+        bool paused; // Stream-specific pause by company
+        bool cancelled;
+        uint64 totalPausedDuration; // Cumulative duration of all completed pauses
+        uint64 pausedAt; // Timestamp when the current pause started (0 if not paused)
     }
 
-    /**
-     * @notice Escrow Protocol: Milestone-based payment
-     * Requires auditor approval before employee can claim
-     */
-    struct Escrow {
-        uint256 paymentId; // Optional link to payment (0 = standalone)
-        address company;
-        address employee;
-        IERC20 token;
-        uint256 amount; // Escrowed amount
-        bytes32 descriptionHash; // Hash of off-chain description
-        EscrowStatus status; // Lifecycle status
-        uint256 createdAt; // Creation timestamp
-        uint256 approvedAt; // Approval timestamp (0 if not approved)
-        uint256 claimedAt; // Claim timestamp (0 if not claimed)
+    struct Milestone {
+        uint256 streamId; // Which salary stream this belongs to
+        address submitter; // Employee who did the work
+        uint256 amount; // How much escrow they're claiming
+        MilestoneStatus status; // PENDING → APPROVED → CLAIMED
+        uint256 createdAt; // When submitted
+        uint256 approvedAt; // When auditor approved
     }
 
     // ============ State ============
-    uint256 private _nextPaymentId = 1;
-    uint256 private _nextEscrowId = 1;
+    uint256 private _nextStreamId = 1;
+    uint256 private _nextMilestoneId = 1;
 
-    mapping(uint256 => Payment) public payments;
-    mapping(uint256 => Escrow) public escrows;
+    mapping(uint256 => Stream) public streams;
+    mapping(uint256 => Milestone) public milestones;
+    mapping(uint256 => uint256[]) public streamMilestones;
+    mapping(address => uint256[]) public employeeMilestones;
+    mapping(address => uint256[]) public companyStreams;
+    mapping(address => uint256[]) public employeeStreams;
 
-    // Tracking arrays
-    mapping(address => uint256[]) public employeePayments;
-    mapping(address => uint256[]) public companyPayments;
-    mapping(address => uint256[]) public employeeEscrows;
-    mapping(address => uint256[]) public companyEscrows;
-    mapping(uint256 => uint256[]) public paymentEscrows; // paymentId => escrowIds[]
+    // --- Stream-Specific Roles ---
+    mapping(uint256 => mapping(address => bool)) public isStreamAuditor;
+    mapping(address => uint256[]) public auditorStreams;
 
-    // Auditor management
-    mapping(uint256 => mapping(address => bool)) public isPaymentAuditor;
-    mapping(uint256 => mapping(address => bool)) public isEscrowAuditor;
-
-    // Admin settings
-    bool public newPaymentsPaused;
-    uint16 public platformFeeBps;
-    address public feeRecipient;
+    // --- Admin-Controlled State ---
+    bool public newStreamsPaused;
     mapping(address => bool) public isTokenWhitelisted;
 
-    // Validation bounds
-    uint256 public constant MIN_PAYMENT_DURATION = 1 days;
-    uint256 public constant MAX_PAYMENT_DURATION = 365 days;
-    uint256 public constant MIN_PAYMENT_AMOUNT = 1000; // wei
-    uint256 public constant MIN_ESCROW_AMOUNT = 1000; // wei
+    // --- Validation Bounds ---
+    uint256 public constant MIN_STREAM_DURATION = 1 days;
+    uint256 public constant MAX_STREAM_DURATION = 365 days;
+    uint256 public constant MIN_STREAM_AMOUNT = 1000; // 0.000000000001 tokens (wei)
 
     // ============ Events ============
-
-    // Admin events
-    event PlatformFeeUpdated(uint16 newFeeBps);
-    event FeeRecipientUpdated(address indexed newRecipient);
-    event NewPaymentsCreationPaused(bool status);
+    event NewStreamCreationPaused(bool status);
     event TokenWhitelistUpdated(address indexed token, bool isWhitelisted);
 
-    // Payment events
-    event PaymentCreated(
-        uint256 indexed paymentId,
+    event StreamAuditorAdded(uint256 indexed streamId, address indexed auditor);
+    event StreamAuditorRemoved(
+        uint256 indexed streamId,
+        address indexed auditor
+    );
+
+    event StreamCreated(
+        uint256 indexed streamId,
         address indexed company,
         address indexed employee,
         address token,
-        uint256 totalAmount,
+        uint256 streamAmount,
+        uint256 escrowAmount,
         uint64 startTime,
-        uint64 stopTime,
-        uint256 feeAmount
+        uint64 stopTime
     );
-    event PaymentWithdrawn(
-        uint256 indexed paymentId,
+
+    event Withdrawn(
+        uint256 indexed streamId,
         address indexed employee,
         uint256 amount
     );
-    event PaymentPaused(uint256 indexed paymentId, address indexed by);
-    event PaymentResumed(uint256 indexed paymentId, address indexed by);
-    event PaymentCancelled(
-        uint256 indexed paymentId,
+    event StreamPaused(uint256 indexed streamId, address indexed by);
+    event StreamResumed(uint256 indexed streamId, address indexed by);
+    event StreamCancelled(
+        uint256 indexed streamId,
         address indexed by,
-        uint256 refunded
+        uint256 refundedStream,
+        uint256 refundedEscrow
     );
 
-    // Escrow events
-    event EscrowCreated(
-        uint256 escrowId,
-        uint256 indexed paymentId,
-        address indexed company,
-        address indexed employee,
-        address token,
-        uint256 amount,
-        bytes32 descriptionHash
-    );
-    event EscrowApproved(uint256 indexed escrowId, address indexed auditor);
-    event EscrowRejected(uint256 indexed escrowId, address indexed auditor);
-    event EscrowClaimed(
-        uint256 indexed escrowId,
-        address indexed employee,
+    event MilestoneSubmitted(
+        uint256 indexed milestoneId,
+        uint256 indexed streamId,
+        address indexed submitter,
         uint256 amount
     );
-    event EscrowCancelled(
-        uint256 indexed escrowId,
-        address indexed company,
-        uint256 refunded
-    );
-
-    // Auditor events
-    event PaymentAuditorAdded(
-        uint256 indexed paymentId,
+    event MilestoneApproved(
+        uint256 indexed milestoneId,
+        uint256 indexed streamId,
         address indexed auditor
     );
-    event PaymentAuditorRemoved(
-        uint256 indexed paymentId,
+    event MilestoneRejected(
+        uint256 indexed milestoneId,
+        uint256 indexed streamId,
         address indexed auditor
     );
-    event EscrowAuditorAdded(uint256 indexed escrowId, address indexed auditor);
-    event EscrowAuditorRemoved(
-        uint256 indexed escrowId,
-        address indexed auditor
+    event MilestoneClaimed(
+        uint256 indexed milestoneId,
+        uint256 indexed streamId,
+        address indexed employee,
+        uint256 amount
     );
 
     // ============ Constructor ============
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        platformFeeBps = 5; // Default 0.05%
-        feeRecipient = msg.sender;
 
         // USDC Mainnet: 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
         isTokenWhitelisted[
@@ -203,28 +170,15 @@ contract Paystream is ReentrancyGuard, AccessControl {
     }
 
     // ============ Admin Functions ============
-
-    function setNewPaymentsPause(
+    /**
+     * @notice Toggles the pause state for new stream creation.
+     * @param status The new pause status.
+     */
+    function setNewStreamPause(
         bool status
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        newPaymentsPaused = status;
-        emit NewPaymentsCreationPaused(status);
-    }
-
-    function setPlatformFee(
-        uint16 newFeeBps
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(newFeeBps <= 10000, "fee cannot exceed 10000");
-        platformFeeBps = newFeeBps;
-        emit PlatformFeeUpdated(newFeeBps);
-    }
-
-    function setFeeRecipient(
-        address newRecipient
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(newRecipient != address(0), "recipient cannot be zero");
-        feeRecipient = newRecipient;
-        emit FeeRecipientUpdated(newRecipient);
+        newStreamsPaused = status;
+        emit NewStreamCreationPaused(status);
     }
 
     /**
@@ -241,472 +195,364 @@ contract Paystream is ReentrancyGuard, AccessControl {
         emit TokenWhitelistUpdated(token, whitelisted);
     }
 
-    // ============ Payment Protocol ============
-
+    // ============ Stream Creation ============
     /**
-     * @notice Create a pure streaming payment
-     * @param employee Recipient address
+     * @notice Create a new salary stream. The caller must have approved tokens.
+     * @param employee Address receiving the stream
      * @param token ERC20 token address
-     * @param totalAmount Total to stream over duration
+     * @param streamAmount Amount to stream continuously over duration
+     * @param escrowAmount Amount to lock in escrow for milestones
      * @param startTime Stream start timestamp
      * @param stopTime Stream end timestamp
-     * @return paymentId The created payment ID
+     * @return streamId The created stream ID
      */
-    function createPayment(
+    function createStream(
         address employee,
         address token,
-        uint256 totalAmount,
+        uint256 streamAmount,
+        uint256 escrowAmount,
         uint64 startTime,
         uint64 stopTime
     ) external nonReentrant returns (uint256) {
-        require(isTokenWhitelisted[token], "Token is not supported");
-        require(!newPaymentsPaused, "payment creation paused"); // For admin pause
+        require(isTokenWhitelisted[token], "token not whitelisted");
+        require(!newStreamsPaused, "stream creation is paused");
         require(employee != address(0), "invalid employee");
+        require(employee != msg.sender, "company cannot be employee");
         require(token != address(0), "invalid token");
-        require(totalAmount >= MIN_PAYMENT_AMOUNT, "amount too small");
-        require(stopTime > startTime, "invalid duration");
+        require(
+            streamAmount >= MIN_STREAM_AMOUNT || escrowAmount >= MIN_STREAM_AMOUNT,
+            "amount too small"
+        );
+        require(stopTime > startTime, "stop time must be after start time");
 
         uint64 duration = stopTime - startTime;
-        require(duration >= MIN_PAYMENT_DURATION, "duration too short");
-        require(duration <= MAX_PAYMENT_DURATION, "duration too long");
+        require(duration >= MIN_STREAM_DURATION, "duration too short");
+        require(duration <= MAX_STREAM_DURATION, "duration too long");
 
-        // Transfer funds
+        uint256 totalAmount = streamAmount + escrowAmount;
+
+        // --- Fund Transfers ---
         IERC20 erc20 = IERC20(token);
         erc20.safeTransferFrom(msg.sender, address(this), totalAmount);
 
-        // Create payment
-        uint256 paymentId = _nextPaymentId++;
-        payments[paymentId] = Payment({
+        // --- Stream Creation ---
+        uint256 streamId = _nextStreamId++;
+        streams[streamId] = Stream({
             company: msg.sender,
             employee: employee,
             token: erc20,
-            totalAmount: totalAmount,
-            withdrawn: 0,
+            streamAmount: streamAmount,
+            escrowAmount: escrowAmount,
             startTime: startTime,
             stopTime: stopTime,
             lastWithdrawTime: startTime,
-            totalPausedDuration: 0,
-            pausedAt: 0,
+            withdrawn: 0,
+            escrowed: escrowAmount, // Initialize escrowed with escrowAmount
             paused: false,
-            cancelled: false
+            cancelled: false,
+            totalPausedDuration: 0,
+            pausedAt: 0
         });
 
-        employeePayments[employee].push(paymentId);
-        companyPayments[msg.sender].push(paymentId);
+        employeeStreams[employee].push(streamId);
+        companyStreams[msg.sender].push(streamId);
 
-        emit PaymentCreated(
-            paymentId,
+        emit StreamCreated(
+            streamId,
             msg.sender,
             employee,
             token,
-            totalAmount,
+            streamAmount,
+            escrowAmount,
             startTime,
-            stopTime,
-            0
+            stopTime
         );
-        return paymentId;
+        return streamId;
     }
 
-    /**
-     * @notice Calculate accrued amount for a payment stream
-     * @param p The payment object
-     * @return The total amount accrued
-     */
-    function _getAccruedAmount(
-        Payment storage p
-    ) internal view returns (uint256) {
+    // ============ Stream-Specific Auditor Management ============
+    function addStreamAuditor(uint256 streamId, address auditor) external {
+        Stream storage s = streams[streamId];
+        require(s.company != address(0), "stream does not exist");
+        require(msg.sender == s.company, "not stream company");
+        require(auditor != address(0), "auditor address cannot be zero");
+        require(auditor != s.employee, "auditor cannot be employee");
+
+        if (!isStreamAuditor[streamId][auditor]) {
+            isStreamAuditor[streamId][auditor] = true;
+            auditorStreams[auditor].push(streamId);
+            emit StreamAuditorAdded(streamId, auditor);
+        }
+    }
+
+    function removeStreamAuditor(uint256 streamId, address auditor) external {
+        Stream storage s = streams[streamId];
+        require(s.company != address(0), "stream does not exist");
+        require(msg.sender == s.company, "not stream company");
+
+        if (isStreamAuditor[streamId][auditor]) {
+            isStreamAuditor[streamId][auditor] = false;
+            _removeFromArray(auditorStreams[auditor], streamId);
+            emit StreamAuditorRemoved(streamId, auditor);
+        }
+    }
+
+    // ============ Core Stream Interaction (Withdraw, Pause, etc.) ============
+
+    function claimable(uint256 streamId) public view returns (uint256) {
+        Stream storage s = streams[streamId];
+        require(s.company != address(0), "stream does not exist");
+
         uint64 nowTs = uint64(block.timestamp);
-        if (nowTs < p.startTime) return 0;
+        if (nowTs < s.startTime) return 0;
 
-        uint64 totalDuration = p.stopTime - p.startTime;
-        if (totalDuration == 0) return p.totalAmount;
+        uint64 totalDuration = s.stopTime - s.startTime;
+        if (totalDuration == 0) return s.streamAmount - s.withdrawn;
 
-        uint64 rawElapsed = nowTs > p.stopTime
+        uint64 rawElapsed = nowTs > s.stopTime
             ? totalDuration
-            : nowTs - p.startTime;
-        uint64 currentPauseDuration = p.paused ? nowTs - p.pausedAt : 0;
-        uint64 totalPausedTime = p.totalPausedDuration + currentPauseDuration;
+            : nowTs - s.startTime;
+
+        uint64 currentPauseDuration = s.paused ? nowTs - s.pausedAt : 0;
+        uint64 totalPausedTime = s.totalPausedDuration + currentPauseDuration;
+
         uint64 workingTime = rawElapsed > totalPausedTime
             ? rawElapsed - totalPausedTime
             : 0;
 
-        uint256 accrued = (p.totalAmount * workingTime) / totalDuration;
+        uint256 accrued = (s.streamAmount * workingTime) / totalDuration;
+        if (accrued > s.streamAmount) accrued = s.streamAmount;
 
-        return accrued > p.totalAmount ? p.totalAmount : accrued;
+        if (accrued <= s.withdrawn) return 0;
+        return accrued - s.withdrawn;
     }
 
-    /**
-     * @notice Calculate claimable amount for a payment
-     * @param paymentId Payment ID
-     * @return Claimable amount
-     */
-    function claimablePayment(uint256 paymentId) public view returns (uint256) {
-        Payment storage p = payments[paymentId];
-        require(p.company != address(0), "payment does not exist");
-        if (p.cancelled) return 0;
+    function withdraw(uint256 streamId) external nonReentrant {
+        Stream storage s = streams[streamId];
+        require(s.company != address(0), "stream does not exist");
+        require(!s.cancelled, "stream cancelled");
+        require(!s.paused, "stream paused");
+        require(msg.sender == s.employee, "not employee");
 
-        uint256 accrued = _getAccruedAmount(p);
-        if (accrued <= p.withdrawn) return 0;
-
-        return accrued - p.withdrawn;
-    }
-
-    /**
-     * @notice Withdraw from payment stream
-     * @param paymentId Payment ID
-     */
-    function withdrawPayment(uint256 paymentId) external nonReentrant {
-        Payment storage p = payments[paymentId];
-        require(p.company != address(0), "payment does not exist");
-        require(!p.cancelled, "payment cancelled");
-        require(!p.paused, "payment paused");
-        require(msg.sender == p.employee, "not employee");
-
-        uint256 amount = claimablePayment(paymentId);
+        uint256 amount = claimable(streamId);
         require(amount > 0, "nothing to withdraw");
 
-        p.withdrawn += amount;
-        p.lastWithdrawTime = uint64(block.timestamp);
+        s.withdrawn += amount;
+        s.lastWithdrawTime = uint64(block.timestamp);
 
-        p.token.safeTransfer(p.employee, amount);
+        s.token.safeTransfer(s.employee, amount);
 
-        emit PaymentWithdrawn(paymentId, p.employee, amount);
+        emit Withdrawn(streamId, s.employee, amount);
     }
 
-    /**
-     * @notice Pause a payment stream
-     * @param paymentId Payment ID
-     */
-    function pausePayment(uint256 paymentId) external {
-        Payment storage p = payments[paymentId];
-        require(p.company != address(0), "payment does not exist");
-        require(msg.sender == p.company, "not company");
-        require(!p.paused, "already paused");
+    function pauseStream(uint256 streamId) external {
+        Stream storage s = streams[streamId];
+        require(s.company != address(0), "stream does not exist");
+        require(msg.sender == s.company, "not company");
+        require(!s.paused, "already paused");
 
-        p.paused = true;
-        p.pausedAt = uint64(block.timestamp);
-        emit PaymentPaused(paymentId, msg.sender);
+        s.paused = true;
+        s.pausedAt = uint64(block.timestamp);
+        emit StreamPaused(streamId, msg.sender);
     }
 
-    /**
-     * @notice Resume a paused payment stream
-     * @param paymentId Payment ID
-     */
-    function resumePayment(uint256 paymentId) external {
-        Payment storage p = payments[paymentId];
-        require(p.company != address(0), "payment does not exist");
-        require(msg.sender == p.company, "not company");
-        require(p.paused, "not paused");
+    function resumeStream(uint256 streamId) external {
+        Stream storage s = streams[streamId];
+        require(s.company != address(0), "stream does not exist");
+        require(msg.sender == s.company, "not company");
+        require(s.paused, "not paused");
 
-        uint64 pauseDuration = uint64(block.timestamp) - p.pausedAt;
-        p.paused = false;
-        p.totalPausedDuration += pauseDuration;
-        p.pausedAt = 0;
+        uint64 pauseDuration = uint64(block.timestamp) - s.pausedAt;
 
-        emit PaymentResumed(paymentId, msg.sender);
+        s.paused = false;
+        s.totalPausedDuration += pauseDuration;
+        s.pausedAt = 0;
+
+        emit StreamResumed(streamId, msg.sender);
     }
 
-    /**
-     * @notice Cancel a payment and refund remaining
-     * @param paymentId Payment ID
-     */
-    function cancelPayment(uint256 paymentId) external nonReentrant {
-        Payment storage p = payments[paymentId];
-        require(p.company != address(0), "payment does not exist");
-        require(!p.cancelled, "already cancelled");
-        require(msg.sender == p.company, "not company");
+    function cancelStream(uint256 streamId) external nonReentrant {
+        Stream storage s = streams[streamId];
+        require(s.company != address(0), "stream does not exist");
+        require(!s.cancelled, "already cancelled");
+        require(msg.sender == s.company, "not company");
 
-        p.cancelled = true;
+        s.cancelled = true;
 
-        uint256 refundAmount = p.totalAmount - p.withdrawn;
-        if (refundAmount > 0) {
-            p.token.safeTransfer(p.company, refundAmount);
+        // Refund unvested stream amount and all remaining escrow
+        uint256 refundStream = s.streamAmount - s.withdrawn;
+        uint256 refundEscrow = s.escrowed;
+
+        if (refundStream > 0) {
+            s.token.safeTransfer(s.company, refundStream);
+        }
+        if (refundEscrow > 0) {
+            s.token.safeTransfer(s.company, refundEscrow);
         }
 
-        emit PaymentCancelled(paymentId, msg.sender, refundAmount);
+        emit StreamCancelled(streamId, msg.sender, refundStream, refundEscrow);
     }
 
-    // ============ Escrow Protocol ============
+    // ============ Milestone Management ============
 
-    /**
-     * @notice Create a milestone-based escrow
-     * @param employee Recipient address
-     * @param token ERC20 token address
-     * @param amount Escrow amount
-     * @param descriptionHash Hash of off-chain description
-     * @param paymentId Optional link to payment (0 for standalone)
-     * @return escrowId The created escrow ID
-     */
-    function createEscrow(
-        address employee,
-        address token,
-        uint256 amount,
-        bytes32 descriptionHash,
-        uint256 paymentId
-    ) external nonReentrant returns (uint256) {
-        require(isTokenWhitelisted[token], "Token is not supported");
-        require(employee != msg.sender, "company cannot be employee");
-        require(employee != address(0), "invalid employee");
-        require(token != address(0), "invalid token");
-        require(amount >= MIN_ESCROW_AMOUNT, "amount too small");
-        require(descriptionHash != bytes32(0), "description hash required");
+    function submitMilestone(
+        uint256 streamId,
+        uint256 amount
+    ) external returns (uint256) {
+        Stream storage s = streams[streamId];
+        require(s.company != address(0), "stream does not exist");
+        require(msg.sender == s.employee, "not employee");
+        require(amount > 0, "amount must be > 0");
+        require(amount <= s.escrowed, "exceeds available escrow");
 
-        // If linked to payment, validate
-        if (paymentId > 0) {
-            Payment storage p = payments[paymentId];
-            require(p.company != address(0), "payment does not exist");
-            require(p.company == msg.sender, "not payment company");
-            require(p.employee == employee, "employee mismatch");
-            require(address(p.token) == token, "token mismatch");
-        }
-
-        // Transfer escrow funds
-        IERC20 erc20 = IERC20(token);
-        erc20.safeTransferFrom(msg.sender, address(this), amount);
-
-        // Create escrow
-        uint256 escrowId = _nextEscrowId++;
-        escrows[escrowId] = Escrow({
-            paymentId: paymentId,
-            company: msg.sender,
-            employee: employee,
-            token: erc20,
+        uint256 milestoneId = _nextMilestoneId++;
+        milestones[milestoneId] = Milestone({
+            streamId: streamId,
+            submitter: msg.sender,
             amount: amount,
-            descriptionHash: descriptionHash,
-            status: EscrowStatus.PENDING,
+            status: MilestoneStatus.PENDING,
             createdAt: block.timestamp,
-            approvedAt: 0,
-            claimedAt: 0
+            approvedAt: 0
         });
 
-        employeeEscrows[employee].push(escrowId);
-        companyEscrows[msg.sender].push(escrowId);
+        streamMilestones[streamId].push(milestoneId);
+        employeeMilestones[msg.sender].push(milestoneId);
 
-        if (paymentId > 0) {
-            paymentEscrows[paymentId].push(escrowId);
+        emit MilestoneSubmitted(milestoneId, streamId, msg.sender, amount);
+        return milestoneId;
+    }
+
+    function approveMilestone(uint256 milestoneId) external {
+        Milestone storage m = milestones[milestoneId];
+        require(m.submitter != address(0), "milestone does not exist");
+        require(m.status == MilestoneStatus.PENDING, "milestone not pending");
+        require(isStreamAuditor[m.streamId][msg.sender], "not stream auditor");
+        require(msg.sender != m.submitter, "auditor cannot be submitter");
+
+        m.status = MilestoneStatus.APPROVED;
+        m.approvedAt = block.timestamp;
+
+        emit MilestoneApproved(milestoneId, m.streamId, msg.sender);
+    }
+
+    function rejectMilestone(uint256 milestoneId) external {
+        Milestone storage m = milestones[milestoneId];
+        require(m.submitter != address(0), "milestone does not exist");
+        require(m.status == MilestoneStatus.PENDING, "milestone not pending");
+        require(isStreamAuditor[m.streamId][msg.sender], "not stream auditor");
+        require(msg.sender != m.submitter, "auditor cannot be submitter");
+
+        m.status = MilestoneStatus.REJECTED;
+
+        emit MilestoneRejected(milestoneId, m.streamId, msg.sender);
+    }
+
+    function claimMilestone(uint256 milestoneId) external nonReentrant {
+        Milestone storage m = milestones[milestoneId];
+        require(m.submitter != address(0), "milestone does not exist");
+        require(m.status == MilestoneStatus.APPROVED, "milestone not approved");
+
+        Stream storage s = streams[m.streamId];
+        require(msg.sender == s.employee, "not employee");
+        require(m.amount <= s.escrowed, "insufficient escrowed balance");
+
+        m.status = MilestoneStatus.CLAIMED;
+        s.escrowed -= m.amount;
+
+        s.token.safeTransfer(m.submitter, m.amount);
+
+        emit MilestoneClaimed(milestoneId, m.streamId, m.submitter, m.amount);
+    }
+
+    // ============ Internal Helper ============
+    /**
+     * @dev Internal helper to remove a value from a uint256 array.
+     * Swaps the element to delete with the last element, then pops.
+     * Order is NOT preserved.
+     */
+    function _removeFromArray(uint256[] storage array, uint256 value) internal {
+        uint256 length = array.length;
+        for (uint256 i = 0; i < length; i++) {
+            if (array[i] == value) {
+                if (i != length - 1) {
+                    array[i] = array[length - 1];
+                }
+                array.pop();
+                break;
+            }
         }
-
-        emit EscrowCreated(
-            escrowId,
-            paymentId,
-            msg.sender,
-            employee,
-            token,
-            amount,
-            descriptionHash
-        );
-        return escrowId;
-    }
-
-    /**
-     * @notice Approve an escrow (auditor only)
-     * @param escrowId Escrow ID
-     */
-    function approveEscrow(uint256 escrowId) external {
-        Escrow storage e = escrows[escrowId];
-        require(e.company != address(0), "escrow does not exist");
-        require(e.status == EscrowStatus.PENDING, "not pending");
-
-        // Check auditor permission
-        bool isAuthorized = false;
-        if (e.paymentId > 0) {
-            isAuthorized = isPaymentAuditor[e.paymentId][msg.sender];
-        } else {
-            isAuthorized = isEscrowAuditor[escrowId][msg.sender];
-        }
-        require(isAuthorized, "not auditor");
-        require(msg.sender != e.employee, "auditor cannot be employee");
-
-        e.status = EscrowStatus.APPROVED;
-        e.approvedAt = block.timestamp;
-
-        emit EscrowApproved(escrowId, msg.sender);
-    }
-
-    /**
-     * @notice Reject an escrow (auditor only)
-     * @param escrowId Escrow ID
-     */
-    function rejectEscrow(uint256 escrowId) external {
-        Escrow storage e = escrows[escrowId];
-        require(e.company != address(0), "escrow does not exist");
-        require(e.status == EscrowStatus.PENDING, "not pending");
-
-        // Check auditor permission
-        bool isAuthorized = false;
-        if (e.paymentId > 0) {
-            isAuthorized = isPaymentAuditor[e.paymentId][msg.sender];
-        } else {
-            isAuthorized = isEscrowAuditor[escrowId][msg.sender];
-        }
-        require(isAuthorized, "not auditor");
-        require(msg.sender != e.employee, "auditor cannot be employee");
-
-        e.status = EscrowStatus.REJECTED;
-
-        emit EscrowRejected(escrowId, msg.sender);
-    }
-
-    /**
-     * @notice Claim approved escrow (employee only)
-     * @param escrowId Escrow ID
-     */
-    function claimEscrow(uint256 escrowId) external nonReentrant {
-        Escrow storage e = escrows[escrowId];
-        require(e.company != address(0), "escrow does not exist");
-        require(e.status == EscrowStatus.APPROVED, "not approved");
-        require(msg.sender == e.employee, "not employee");
-
-        e.status = EscrowStatus.CLAIMED;
-        e.claimedAt = block.timestamp;
-
-        e.token.safeTransfer(e.employee, e.amount);
-
-        emit EscrowClaimed(escrowId, e.employee, e.amount);
-    }
-
-    /**
-     * @notice Cancel escrow and refund (company only, if pending or rejected)
-     * @param escrowId Escrow ID
-     */
-    function cancelEscrow(uint256 escrowId) external nonReentrant {
-        Escrow storage e = escrows[escrowId];
-        require(e.company != address(0), "escrow does not exist");
-        require(msg.sender == e.company, "not company");
-        require(
-            e.status == EscrowStatus.PENDING ||
-                e.status == EscrowStatus.REJECTED,
-            "cannot cancel"
-        );
-
-        e.status = EscrowStatus.CANCELLED;
-
-        e.token.safeTransfer(e.company, e.amount);
-
-        emit EscrowCancelled(escrowId, e.company, e.amount);
-    }
-
-    // ============ Auditor Management ============
-
-    function addPaymentAuditor(uint256 paymentId, address auditor) external {
-        Payment storage p = payments[paymentId];
-        require(p.company != address(0), "payment does not exist");
-        require(msg.sender == p.company, "not company");
-        require(auditor != address(0), "invalid auditor");
-        require(auditor != p.employee, "auditor cannot be employee");
-
-        isPaymentAuditor[paymentId][auditor] = true;
-        emit PaymentAuditorAdded(paymentId, auditor);
-    }
-
-    function removePaymentAuditor(uint256 paymentId, address auditor) external {
-        Payment storage p = payments[paymentId];
-        require(p.company != address(0), "payment does not exist");
-        require(msg.sender == p.company, "not company");
-
-        isPaymentAuditor[paymentId][auditor] = false;
-        emit PaymentAuditorRemoved(paymentId, auditor);
-    }
-
-    function addEscrowAuditor(uint256 escrowId, address auditor) external {
-        Escrow storage e = escrows[escrowId];
-        require(e.company != address(0), "escrow does not exist");
-        require(msg.sender == e.company, "not company");
-        require(auditor != address(0), "invalid auditor");
-        require(auditor != e.employee, "auditor cannot be employee");
-        require(e.paymentId == 0, "use payment auditor for linked escrow");
-
-        isEscrowAuditor[escrowId][auditor] = true;
-        emit EscrowAuditorAdded(escrowId, auditor);
-    }
-
-    function removeEscrowAuditor(uint256 escrowId, address auditor) external {
-        Escrow storage e = escrows[escrowId];
-        require(e.company != address(0), "escrow does not exist");
-        require(msg.sender == e.company, "not company");
-        require(e.paymentId == 0, "use payment auditor for linked escrow");
-
-        isEscrowAuditor[escrowId][auditor] = false;
-        emit EscrowAuditorRemoved(escrowId, auditor);
     }
 
     // ============ View Functions ============
-
-    function getPayment(
-        uint256 paymentId
-    ) external view returns (Payment memory) {
-        return payments[paymentId];
+    function getStream(uint256 streamId) external view returns (Stream memory) {
+        return streams[streamId];
     }
 
-    function getEscrow(uint256 escrowId) external view returns (Escrow memory) {
-        return escrows[escrowId];
+    function getMilestone(
+        uint256 milestoneId
+    ) external view returns (Milestone memory) {
+        return milestones[milestoneId];
     }
 
-    function getEmployeePayments(
+    function getStreamMilestones(
+        uint256 streamId
+    ) external view returns (uint256[] memory) {
+        return streamMilestones[streamId];
+    }
+
+    function getEmployeeMilestones(
         address employee
     ) external view returns (uint256[] memory) {
-        return employeePayments[employee];
+        return employeeMilestones[employee];
     }
 
-    function getCompanyPayments(
+    function getEmployeeStreams(
+        address employee
+    ) external view returns (uint256[] memory) {
+        return employeeStreams[employee];
+    }
+
+    function getCompanyStreams(
         address company
     ) external view returns (uint256[] memory) {
-        return companyPayments[company];
+        return companyStreams[company];
     }
 
-    function getEmployeeEscrows(
-        address employee
+    function getAuditorStreams(
+        address auditor
     ) external view returns (uint256[] memory) {
-        return employeeEscrows[employee];
+        return auditorStreams[auditor];
     }
 
-    function getCompanyEscrows(
-        address company
-    ) external view returns (uint256[] memory) {
-        return companyEscrows[company];
+    function getEscrowedAmount(
+        uint256 streamId
+    ) external view returns (uint256) {
+        return streams[streamId].escrowed;
     }
 
-    function getPaymentEscrows(
-        uint256 paymentId
-    ) external view returns (uint256[] memory) {
-        return paymentEscrows[paymentId];
-    }
+    function getTotalEarned(uint256 streamId) external view returns (uint256) {
+        Stream storage s = streams[streamId];
 
-    /**
-     * @notice Get all claimable escrows for an employee
-     * @param employee Employee address
-     * @return Array of escrow IDs with APPROVED status
-     */
-    function getClaimableEscrows(
-        address employee
-    ) external view returns (uint256[] memory) {
-        uint256[] memory allEscrows = employeeEscrows[employee];
-        uint256[] memory claimable = new uint256[](allEscrows.length);
-        uint256 claimableCount = 0;
+        uint64 nowTs = uint64(block.timestamp);
+        if (nowTs < s.startTime) return 0;
 
-        for (uint256 i = 0; i < allEscrows.length; i++) {
-            uint256 escrowId = allEscrows[i];
-            if (escrows[escrowId].status == EscrowStatus.APPROVED) {
-                claimable[claimableCount] = escrowId;
-                claimableCount++;
-            }
-        }
+        uint64 totalDuration = s.stopTime - s.startTime;
+        if (totalDuration == 0) return s.streamAmount;
 
-        // Resize the array to the actual number of claimable escrows
-        assembly {
-            mstore(claimable, claimableCount)
-        }
+        uint64 rawElapsed = nowTs > s.stopTime
+            ? totalDuration
+            : nowTs - s.startTime;
 
-        return claimable;
-    }
+        uint64 currentPauseDuration = s.paused ? nowTs - s.pausedAt : 0;
+        uint64 totalPausedTime = s.totalPausedDuration + currentPauseDuration;
 
-    /**
-     * @notice Get total earned for a payment (including withdrawn + claimable)
-     * @param paymentId Payment ID
-     */
-    function getTotalEarned(uint256 paymentId) external view returns (uint256) {
-        Payment storage p = payments[paymentId];
-        require(p.company != address(0), "payment does not exist");
-        return _getAccruedAmount(p);
+        uint64 workingTime = rawElapsed > totalPausedTime
+            ? rawElapsed - totalPausedTime
+            : 0;
+
+        uint256 accrued = (s.streamAmount * workingTime) / totalDuration;
+        if (accrued > s.streamAmount) accrued = s.streamAmount;
+
+        return accrued;
     }
 }
