@@ -45,9 +45,10 @@ export default function Home() {
       console.log("Attempting to connect...");
       try {
         await connectAsync({ connector });
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Connection failed:", err);
-        if (err.code === -32002 || err.message?.includes("already pending")) {
+        const error = err as { code?: number; message?: string };
+        if (error.code === -32002 || error.message?.includes("already pending")) {
           setCustomError("A connection request is already pending. Please check your wallet extension (MetaMask) to approve the request.");
         }
       }

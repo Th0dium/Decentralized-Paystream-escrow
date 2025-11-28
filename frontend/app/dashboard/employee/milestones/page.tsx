@@ -54,7 +54,7 @@ export default function MilestonesPage() {
       {!isEmployee && (
         <div className="mb-6 p-4 bg-blue-900/20 border border-blue-800/50 rounded-lg">
           <p className="text-sm text-blue-300">
-            💡 You don't have an employee role. Data shown below is for viewing only.
+            💡 You don&apos;t have an employee role. Data shown below is for viewing only.
           </p>
         </div>
       )}
