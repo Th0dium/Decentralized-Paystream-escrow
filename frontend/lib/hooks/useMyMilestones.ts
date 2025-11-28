@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Address } from 'viem'
 import { usePublicClient } from 'wagmi'
-import { PAYSTREAM_ABI } from '@/lib/contract-interaction'
+import { PAYSTREAM_ABI, getTokenSymbol, getTokenDecimals } from '@/lib/contract-interaction' // Import new functions
 
 const PAYSTREAM_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS as Address
 
@@ -20,6 +20,8 @@ export interface EnrichedMilestone {
   status: MilestoneStatus
   createdAt: number
   approvedAt: number
+  tokenSymbol: string // Added
+  tokenDecimals: number // Added
   // Computed/Extra
   ipfsHash?: string // Not on chain in current contract version, but kept for type compatibility
 }
@@ -50,13 +52,6 @@ export function useMyMilestones(userAddress: Address | null, role: 'employee' | 
     try {
       setData(prev => ({ ...prev, isLoading: true, error: null }))
 
-      // 1. Get IDs based on role
-      // For auditor, logic is tricky because there is no 'getAuditorMilestones'. 
-      // Auditor is assigned to STREAMS. So we need to:
-      // a. Get auditor streams.
-      // b. Get milestones for those streams.
-      // OR: For now, let's focus on 'employee' role first as it has a direct mapping.
-      
       let milestoneIds: bigint[] = [];
 
       if (role === 'employee') {
@@ -94,7 +89,6 @@ export function useMyMilestones(userAddress: Address | null, role: 'employee' | 
             }
          } catch (err) {
              console.error("Error fetching auditor milestones:", err);
-             // fail silently or throw? Let's just keep empty array
              milestoneIds = [];
          }
       }
@@ -109,22 +103,62 @@ export function useMyMilestones(userAddress: Address | null, role: 'employee' | 
         publicClient.readContract({
             address: PAYSTREAM_ADDRESS,
             abi: PAYSTREAM_ABI,
-            functionName: 'getMilestone', // Ensure in ABI
+            functionName: 'getMilestone',
             args: [id]
         })
       );
 
       const results = await Promise.all(detailsPromises);
 
-      const milestones: EnrichedMilestone[] = results.map((m: any, index) => ({
-        milestoneId: Number(milestoneIds[index]),
-        streamId: Number(m.streamId),
-        submitter: m.submitter,
-        amount: m.amount,
-        status: m.status,
-        createdAt: Number(m.createdAt),
-        approvedAt: Number(m.approvedAt),
-      }));
+      // Extract unique token addresses from associated streams
+      const uniqueStreamIds = Array.from(new Set(results.map((m: any) => m.streamId)));
+      const streamTokenMap: { [streamId: number]: Address } = {};
+      const tokenAddressSet = new Set<Address>();
+
+      if (uniqueStreamIds.length > 0) {
+        const streamPromises = uniqueStreamIds.map(streamId =>
+            publicClient.readContract({
+                address: PAYSTREAM_ADDRESS,
+                abi: PAYSTREAM_ABI,
+                functionName: 'getStream',
+                args: [BigInt(streamId)],
+            })
+        );
+        const streamResults = await Promise.all(streamPromises);
+        streamResults.forEach((s: any, index) => {
+            const currentStreamId = Number(uniqueStreamIds[index]);
+            streamTokenMap[currentStreamId] = s.token;
+            tokenAddressSet.add(s.token);
+        });
+      }
+
+      // Fetch token details for all unique tokens in parallel
+      const uniqueTokenAddresses = Array.from(tokenAddressSet);
+      const tokenDetailsPromises = uniqueTokenAddresses.map(async (tokenAddress: Address) => {
+        const [symbol, decimals] = await Promise.all([
+          getTokenSymbol(tokenAddress),
+          getTokenDecimals(tokenAddress)
+        ]);
+        return { [tokenAddress]: { symbol, decimals } };
+      });
+      const allTokenDetails = Object.assign({}, ...(await Promise.all(tokenDetailsPromises)));
+
+      const milestones: EnrichedMilestone[] = results.map((m: any, index) => {
+        const tokenAddress = streamTokenMap[Number(m.streamId)];
+        const tokenInfo = allTokenDetails[tokenAddress];
+
+        return {
+          milestoneId: Number(milestoneIds[index]),
+          streamId: Number(m.streamId),
+          submitter: m.submitter,
+          amount: m.amount,
+          status: m.status,
+          createdAt: Number(m.createdAt),
+          approvedAt: Number(m.approvedAt),
+          tokenSymbol: tokenInfo?.symbol || 'UNKNOWN',
+          tokenDecimals: tokenInfo?.decimals || 18,
+        };
+      });
 
       // Sort by newest first
       milestones.sort((a, b) => b.createdAt - a.createdAt);

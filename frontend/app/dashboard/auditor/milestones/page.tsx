@@ -13,8 +13,8 @@ const ITEMS_PER_PAGE = 10;
 
 export default function AuditorMilestonesPage() {
   const { walletAddress, isAuditor } = useAuth();
-  const { asAuditor: auditorStreams, isLoading: streamsLoading } = useMyPayments(walletAddress as any);
-  const { milestones, isLoading: milestonesLoading } = useMyMilestones(walletAddress as any, 'auditor');
+  const { asAuditor: auditorStreams, isLoading: streamsLoading, refetch: refetchStreams } = useMyPayments(walletAddress as any);
+  const { milestones, isLoading: milestonesLoading, refetch: refetchMilestones } = useMyMilestones(walletAddress as any, 'auditor');
   
   const [reviewingId, setReviewingId] = useState<number | null>(null);
   const [reviewAction, setReviewAction] = useState<"approve" | "reject" | null>(null);
@@ -40,7 +40,7 @@ export default function AuditorMilestonesPage() {
       }
 
       // Refetch or reload
-      setTimeout(() => window.location.reload(), 2000);
+      await Promise.all([refetchStreams(), refetchMilestones()]);
     } catch (error) {
       console.error(`Failed to ${action} milestone:`, error);
       alert(`Failed to ${action}: ` + (error instanceof Error ? error.message : "Unknown error"));
@@ -113,7 +113,7 @@ export default function AuditorMilestonesPage() {
                             <div>
                                 <div className="text-sm text-slate-400">Amount Requested</div>
                                 <div className="text-lg font-semibold text-slate-100">
-                                    {formatUnits(milestone.amount, 18)} tokens
+                                    {formatUnits(milestone.amount, milestone.tokenDecimals)} {milestone.tokenSymbol}
                                 </div>
                             </div>
                             <div>
@@ -189,13 +189,13 @@ export default function AuditorMilestonesPage() {
                     <div>
                       <div className="text-sm text-slate-400">Escrow Amount</div>
                       <div className="text-lg font-semibold text-purple-400">
-                        {formatUnits(stream.escrowAmount, 18)}
+                        {formatUnits(stream.escrowAmount, stream.tokenDecimals)} {stream.tokenSymbol}
                       </div>
                     </div>
                     <div>
                       <div className="text-sm text-slate-400">Stream Amount</div>
                       <div className="text-lg font-semibold text-slate-100">
-                        {formatUnits(stream.streamAmount, 18)}
+                        {formatUnits(stream.streamAmount, stream.tokenDecimals)} {stream.tokenSymbol}
                       </div>
                     </div>
                     <div>

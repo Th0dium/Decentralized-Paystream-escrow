@@ -6,12 +6,13 @@ import { useMyPayments } from "@/lib/hooks/useMyPayments";
 import { formatUnits } from "viem";
 import { useState } from "react";
 import { withdrawStream } from "@/lib/contract-interaction";
+import { Button } from "@/components/Button"; // Import Button
 
 const ITEMS_PER_PAGE = 10;
 
 export default function EmployeeStreamsPage() {
   const { walletAddress, isEmployee } = useAuth();
-  const { asEmployee: streams, isLoading: loading, error } = useMyPayments(walletAddress as any);
+  const { asEmployee: streams, isLoading: loading, error, refetch } = useMyPayments(walletAddress as any);
   const [currentPage, setCurrentPage] = useState(1);
   const [withdrawing, setWithdrawing] = useState<number | null>(null);
 
@@ -29,13 +30,17 @@ export default function EmployeeStreamsPage() {
 
       await withdrawStream(contractAddress as any, paymentId.toString());
       // Refetch after withdraw
-      setTimeout(() => window.location.reload(), 2000);
+      await refetch();
     } catch (err) {
       console.error("Withdraw error:", err);
       alert("Withdraw failed: " + (err instanceof Error ? err.message : "Unknown error"));
     } finally {
       setWithdrawing(null);
     }
+  };
+
+  const handleRefresh = async () => {
+    await refetch();
   };
 
   if (loading) {
@@ -56,7 +61,15 @@ export default function EmployeeStreamsPage() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-8 text-slate-100">My Salary Streams</h1>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold text-slate-100">My Salary Streams</h1>
+        <Button
+          onClick={handleRefresh}
+          variant="secondary"
+        >
+          Refresh
+        </Button>
+      </div>
 
       {!isEmployee && (
         <div className="mb-6 p-4 bg-blue-900/20 border border-blue-800/50 rounded-lg">
@@ -104,19 +117,19 @@ export default function EmployeeStreamsPage() {
                   <div>
                     <div className="text-sm text-slate-400">Stream Amount</div>
                     <div className="text-lg font-semibold text-slate-100">
-                      {formatUnits(stream.streamAmount, 18)}
+                      {formatUnits(stream.streamAmount, stream.tokenDecimals)} {stream.tokenSymbol}
                     </div>
                   </div>
                   <div>
                     <div className="text-sm text-slate-400">Claimable</div>
                     <div className="text-lg font-semibold text-green-400">
-                      {stream.claimableAmount ? formatUnits(stream.claimableAmount, 18) : "0"}
+                      {stream.claimableAmount ? formatUnits(stream.claimableAmount, stream.tokenDecimals) : "0"} {stream.tokenSymbol}
                     </div>
                   </div>
                   <div>
                     <div className="text-sm text-slate-400">Withdrawn</div>
                     <div className="text-lg font-semibold text-slate-100">
-                      {formatUnits(stream.withdrawn, 18)}
+                      {formatUnits(stream.withdrawn, stream.tokenDecimals)} {stream.tokenSymbol}
                     </div>
                   </div>
                   <div>

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Address } from 'viem'
 import { usePublicClient } from 'wagmi'
-import { PAYSTREAM_ABI } from '@/lib/contract-interaction'
+import { PAYSTREAM_ABI, getTokenSymbol, getTokenDecimals } from '@/lib/contract-interaction' // Import new functions
 
 const PAYSTREAM_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS as Address
 
@@ -9,7 +9,9 @@ export interface EnrichedStream {
   paymentId: number
   company: string
   employee: string
-  token: string
+  token: string // token address
+  tokenSymbol: string // Added
+  tokenDecimals: number // Added
   streamAmount: bigint
   escrowAmount: bigint
   startTime: bigint
@@ -39,7 +41,7 @@ interface UseMyPaymentsReturn {
 }
 
 export function useMyPayments(userAddress: Address | null): UseMyPaymentsReturn {
-  const publicClient = usePublicClient(); // Use wagmi hook to get the client
+  const publicClient = usePublicClient();
   
   const [data, setData] = useState<UseMyPaymentsReturn>({
     asEmployee: [],
@@ -83,11 +85,23 @@ export function useMyPayments(userAddress: Address | null): UseMyPaymentsReturn 
           publicClient.readContract({
             address: PAYSTREAM_ADDRESS,
             abi: PAYSTREAM_ABI,
-            functionName: 'getStream', // Use specific getter if available or map to struct
+            functionName: 'getStream',
             args: [BigInt(id)],
           })
         )
       )
+
+      // Fetch token details for all unique tokens in parallel
+      const uniqueTokenAddresses = Array.from(new Set(streamDetails.map(s => (s as any).token)));
+      const tokenDetailsPromises = uniqueTokenAddresses.map(async (tokenAddress: Address) => {
+        const [symbol, decimals] = await Promise.all([
+          getTokenSymbol(tokenAddress),
+          getTokenDecimals(tokenAddress)
+        ]);
+        return { [tokenAddress]: { symbol, decimals } };
+      });
+      const allTokenDetails = Object.assign({}, ...(await Promise.all(tokenDetailsPromises)));
+
 
       return streamDetails.map((stream, index) => {
         const s = stream as any // Stream struct from contract
@@ -108,12 +122,16 @@ export function useMyPayments(userAddress: Address | null): UseMyPaymentsReturn 
           // Ensure non-negative
           if (claimableAmount < 0n) claimableAmount = 0n
         }
+        
+        const tokenInfo = allTokenDetails[s.token];
 
         return {
           paymentId: streamId,
           company: s.company,
           employee: s.employee,
           token: s.token,
+          tokenSymbol: tokenInfo?.symbol || 'UNKNOWN', // Added
+          tokenDecimals: tokenInfo?.decimals || 18,    // Added
           streamAmount: s.streamAmount,
           escrowAmount: s.escrowAmount,
           startTime: s.startTime,

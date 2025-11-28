@@ -157,28 +157,28 @@ export const PAYSTREAM_ABI = [
   },
   {
     inputs: [{ internalType: "uint256", name: "streamId", type: "uint256" }],
-    name: "withdrawPayment",
+    name: "withdraw",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
   {
     inputs: [{ internalType: "uint256", name: "streamId", type: "uint256" }],
-    name: "pausePayment",
+    name: "pauseStream",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
   {
     inputs: [{ internalType: "uint256", name: "streamId", type: "uint256" }],
-    name: "resumePayment",
+    name: "resumeStream",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
   {
     inputs: [{ internalType: "uint256", name: "streamId", type: "uint256" }],
-    name: "cancelPayment",
+    name: "cancelStream",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -242,7 +242,49 @@ const ERC20_ABI = [
     stateMutability: "view",
     type: "function",
   },
+  {
+    inputs: [],
+    name: "symbol",
+    outputs: [{ internalType: "string", name: "", type: "string" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "name",
+    outputs: [{ internalType: "string", name: "", type: "string" }],
+    stateMutability: "view",
+    type: "function",
+  },
 ] as const;
+
+/**
+ * Get token symbol
+ */
+export async function getTokenSymbol(
+  tokenAddress: Address,
+): Promise<string> {
+    const symbol = await readContract(config, {
+        address: tokenAddress,
+        abi: ERC20_ABI,
+        functionName: 'symbol',
+    });
+    return symbol as string;
+}
+
+/**
+ * Get token name
+ */
+export async function getTokenName(
+  tokenAddress: Address,
+): Promise<string> {
+    const name = await readContract(config, {
+        address: tokenAddress,
+        abi: ERC20_ABI,
+        functionName: 'name',
+    });
+    return name as string;
+}
 
 /**
  * Fetch all streams where the user is the employee.
@@ -477,7 +519,7 @@ export async function withdrawStream(
     const hash = await writeContract(config, {
       address: contractAddress,
       abi: PAYSTREAM_ABI,
-      functionName: "withdrawPayment",
+      functionName: "withdraw",
       args: [BigInt(streamId)],
     });
 
@@ -507,7 +549,7 @@ export async function pauseStream(
     const hash = await writeContract(config, {
       address: contractAddress,
       abi: PAYSTREAM_ABI,
-      functionName: "pausePayment",
+      functionName: "pauseStream",
       args: [BigInt(streamId)],
     });
 
@@ -537,7 +579,7 @@ export async function resumeStream(
     const hash = await writeContract(config, {
       address: contractAddress,
       abi: PAYSTREAM_ABI,
-      functionName: "resumePayment",
+      functionName: "resumeStream",
       args: [BigInt(streamId)],
     });
 
@@ -567,7 +609,7 @@ export async function cancelStream(
     const hash = await writeContract(config, {
       address: contractAddress,
       abi: PAYSTREAM_ABI,
-      functionName: "cancelPayment",
+      functionName: "cancelStream",
       args: [BigInt(streamId)],
     });
 

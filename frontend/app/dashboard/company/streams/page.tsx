@@ -59,7 +59,7 @@ export default function CompanyStreamsPage() {
       }
 
       // Refetch after action
-      setTimeout(() => window.location.reload(), 2000);
+      await refetch();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Action failed");
     } finally {
@@ -152,19 +152,19 @@ export default function CompanyStreamsPage() {
                   <div>
                     <div className="text-sm text-slate-400">Stream Amount</div>
                     <div className="text-lg font-semibold text-slate-100">
-                      {formatUnits(stream.streamAmount, 18)}
+                      {formatUnits(stream.streamAmount, stream.tokenDecimals)} {stream.tokenSymbol}
                     </div>
                   </div>
                   <div>
                     <div className="text-sm text-slate-400">Escrow Amount</div>
                     <div className="text-lg font-semibold text-purple-400">
-                      {formatUnits(stream.escrowAmount, 18)}
+                      {formatUnits(stream.escrowAmount, stream.tokenDecimals)} {stream.tokenSymbol}
                     </div>
                   </div>
                   <div>
                     <div className="text-sm text-slate-400">Withdrawn</div>
                     <div className="text-lg font-semibold text-slate-100">
-                      {formatUnits(stream.withdrawn, 18)}
+                      {formatUnits(stream.withdrawn, stream.tokenDecimals)} {stream.tokenSymbol}
                     </div>
                   </div>
                   <div>
