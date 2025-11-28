@@ -3,24 +3,43 @@
 import { useState } from "react";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
-import { useAuth, useEmployeeMilestones } from "@/lib/hooks";
-import { MilestoneStatus } from "@/lib/types";
+import { useAuth } from "@/lib/hooks";
+import { useMyMilestones, MilestoneStatus } from "@/lib/hooks/useMyMilestones";
+import { claimMilestone } from "@/lib/contract-interaction";
+import { formatUnits } from "viem";
+
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
 
 export default function MilestonesPage() {
   const { walletAddress, isEmployee } = useAuth();
-  const { milestones, loading } = useEmployeeMilestones(walletAddress);
-  const [isClaimingIndex, setIsClaimingIndex] = useState<number | null>(null);
+  const { milestones, isLoading } = useMyMilestones(walletAddress as any, 'employee');
+  const [isClaimingId, setIsClaimingId] = useState<number | null>(null);
 
   const handleClaimMilestone = async (milestoneId: number) => {
-    setIsClaimingIndex(milestoneId);
+    setIsClaimingId(milestoneId);
 
     try {
-      // TODO: Call smart contract claim function
-      console.log("Claiming milestone:", milestoneId);
+      if (!CONTRACT_ADDRESS) throw new Error("Contract address not configured");
+      
+      await claimMilestone(CONTRACT_ADDRESS as any, milestoneId.toString());
+      
+      // Auto-refresh handled by hook or page reload
+      setTimeout(() => window.location.reload(), 2000);
     } catch (error) {
       console.error("Failed to claim milestone:", error);
+      alert("Failed to claim: " + (error instanceof Error ? error.message : "Unknown error"));
     } finally {
-      setIsClaimingIndex(null);
+      setIsClaimingId(null);
+    }
+  };
+
+  const getStatusLabel = (status: MilestoneStatus) => {
+    switch (status) {
+      case MilestoneStatus.PENDING: return "Pending";
+      case MilestoneStatus.APPROVED: return "Approved";
+      case MilestoneStatus.REJECTED: return "Rejected";
+      case MilestoneStatus.CLAIMED: return "Claimed";
+      default: return "Unknown";
     }
   };
 
@@ -39,7 +58,7 @@ export default function MilestonesPage() {
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-lg text-slate-400">Loading milestones...</div>
@@ -84,7 +103,7 @@ export default function MilestonesPage() {
                     milestone.status
                   )}`}
                 >
-                  {milestone.status}
+                  {getStatusLabel(milestone.status)}
                 </span>
               </div>
 
@@ -92,8 +111,7 @@ export default function MilestonesPage() {
                 <div>
                   <div className="text-sm text-slate-400">Amount</div>
                   <div className="text-lg font-semibold text-slate-100">
-                    {(BigInt(milestone.amount) / BigInt(10 ** 18)).toString()}{" "}
-                    tokens
+                    {formatUnits(milestone.amount, 18)} tokens
                   </div>
                 </div>
                 <div>
@@ -102,7 +120,7 @@ export default function MilestonesPage() {
                     {new Date(milestone.createdAt * 1000).toLocaleDateString()}
                   </div>
                 </div>
-                {milestone.approvedAt && (
+                {milestone.approvedAt > 0 && (
                   <div>
                     <div className="text-sm text-slate-400">Approved</div>
                     <div className="text-sm font-semibold text-slate-100">
@@ -114,20 +132,12 @@ export default function MilestonesPage() {
                 )}
               </div>
 
-              {milestone.ipfsHash && (
-                <div className="mb-4">
-                  <p className="text-sm text-slate-400">Evidence (IPFS):</p>
-                  <p className="text-xs font-mono text-blue-400 break-all">
-                    {milestone.ipfsHash}
-                  </p>
-                </div>
-              )}
-
               {milestone.status === MilestoneStatus.APPROVED &&
-                (isClaimingIndex === milestone.milestoneId ? (
-                  <p className="text-sm text-blue-400">Claiming...</p>
+                (isClaimingId === milestone.milestoneId ? (
+                  <Button className="w-full" disabled>Processing...</Button>
                 ) : (
                   <Button
+                    className="w-full"
                     onClick={() =>
                       handleClaimMilestone(milestone.milestoneId)
                     }

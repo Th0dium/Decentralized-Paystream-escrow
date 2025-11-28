@@ -8,21 +8,8 @@ import {
 import { config } from "./wallet-provider";
 
 // Minimal Paystream ABI with just the functions we need
-const PAYSTREAM_ABI = [
-  {
-    inputs: [
-      { internalType: "address", name: "employee", type: "address" },
-      { internalType: "address", name: "token", type: "address" },
-      { internalType: "uint256", name: "streamAmount", type: "uint256" },
-      { internalType: "uint256", name: "escrowAmount", type: "uint256" },
-      { internalType: "uint64", name: "startTime", type: "uint64" },
-      { internalType: "uint64", name: "stopTime", type: "uint64" },
-    ],
-    name: "createStream",
-    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
+export const PAYSTREAM_ABI = [
+  // --- Events ---
   {
     anonymous: false,
     inputs: [
@@ -38,11 +25,193 @@ const PAYSTREAM_ABI = [
     name: "StreamCreated",
     type: "event",
   },
+  // --- View Functions ---
   {
     inputs: [{ internalType: "address", name: "token", type: "address" }],
     name: "isTokenWhitelisted",
     outputs: [{ internalType: "bool", name: "", type: "bool" }],
     stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "streamId", type: "uint256" }],
+    name: "getStream",
+    outputs: [
+      {
+        components: [
+          { internalType: "address", name: "company", type: "address" },
+          { internalType: "address", name: "employee", type: "address" },
+          { internalType: "address", name: "token", type: "address" }, // Note: changed from contract IERC20 to address for compatibility
+          { internalType: "uint256", name: "streamAmount", type: "uint256" },
+          { internalType: "uint256", name: "escrowAmount", type: "uint256" },
+          { internalType: "uint64", name: "startTime", type: "uint64" },
+          { internalType: "uint64", name: "stopTime", type: "uint64" },
+          { internalType: "uint64", name: "lastWithdrawTime", type: "uint64" },
+          { internalType: "uint256", name: "withdrawn", type: "uint256" },
+          { internalType: "uint256", name: "escrowed", type: "uint256" },
+          { internalType: "bool", name: "paused", type: "bool" },
+          { internalType: "bool", name: "cancelled", type: "bool" },
+          { internalType: "uint64", name: "totalPausedDuration", type: "uint64" },
+          { internalType: "uint64", name: "pausedAt", type: "uint64" },
+        ],
+        internalType: "struct Paystream.Stream",
+        name: "",
+        type: "tuple",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    name: "streams",
+    outputs: [
+      { internalType: "address", name: "company", type: "address" },
+      { internalType: "address", name: "employee", type: "address" },
+      { internalType: "address", name: "token", type: "address" },
+      { internalType: "uint256", name: "streamAmount", type: "uint256" },
+      { internalType: "uint256", name: "escrowAmount", type: "uint256" },
+      { internalType: "uint64", name: "startTime", type: "uint64" },
+      { internalType: "uint64", name: "stopTime", type: "uint64" },
+      { internalType: "uint64", name: "lastWithdrawTime", type: "uint64" },
+      { internalType: "uint256", name: "withdrawn", type: "uint256" },
+      { internalType: "uint256", name: "escrowed", type: "uint256" },
+      { internalType: "bool", name: "paused", type: "bool" },
+      { internalType: "bool", name: "cancelled", type: "bool" },
+      { internalType: "uint64", name: "totalPausedDuration", type: "uint64" },
+      { internalType: "uint64", name: "pausedAt", type: "uint64" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address", name: "employee", type: "address" }],
+    name: "getEmployeeStreams",
+    outputs: [{ internalType: "uint256[]", name: "", type: "uint256[]" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address", name: "company", type: "address" }],
+    name: "getCompanyStreams",
+    outputs: [{ internalType: "uint256[]", name: "", type: "uint256[]" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address", name: "", type: "address" }],
+    name: "getAuditorStreams",
+    outputs: [{ internalType: "uint256[]", name: "", type: "uint256[]" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address", name: "employee", type: "address" }],
+    name: "getEmployeeMilestones",
+    outputs: [{ internalType: "uint256[]", name: "", type: "uint256[]" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "streamId", type: "uint256" }],
+    name: "getStreamMilestones",
+    outputs: [{ internalType: "uint256[]", name: "", type: "uint256[]" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "milestoneId", type: "uint256" }],
+    name: "getMilestone",
+    outputs: [
+      {
+        components: [
+          { internalType: "uint256", name: "streamId", type: "uint256" },
+          { internalType: "address", name: "submitter", type: "address" },
+          { internalType: "uint256", name: "amount", type: "uint256" },
+          { internalType: "enum Paystream.MilestoneStatus", name: "status", type: "uint8" },
+          { internalType: "uint256", name: "createdAt", type: "uint256" },
+          { internalType: "uint256", name: "approvedAt", type: "uint256" },
+        ],
+        internalType: "struct Paystream.Milestone",
+        name: "",
+        type: "tuple",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  // --- Write Functions ---
+  {
+    inputs: [
+      { internalType: "address", name: "employee", type: "address" },
+      { internalType: "address", name: "token", type: "address" },
+      { internalType: "uint256", name: "streamAmount", type: "uint256" },
+      { internalType: "uint256", name: "escrowAmount", type: "uint256" },
+      { internalType: "uint64", name: "startTime", type: "uint64" },
+      { internalType: "uint64", name: "stopTime", type: "uint64" },
+    ],
+    name: "createStream",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "streamId", type: "uint256" }],
+    name: "withdrawPayment",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "streamId", type: "uint256" }],
+    name: "pausePayment",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "streamId", type: "uint256" }],
+    name: "resumePayment",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "streamId", type: "uint256" }],
+    name: "cancelPayment",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "uint256", name: "streamId", type: "uint256" },
+      { internalType: "uint256", name: "amount", type: "uint256" },
+    ],
+    name: "submitMilestone",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "milestoneId", type: "uint256" }],
+    name: "approveMilestone",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "milestoneId", type: "uint256" }],
+    name: "rejectMilestone",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "milestoneId", type: "uint256" }],
+    name: "claimMilestone",
+    outputs: [],
+    stateMutability: "nonpayable",
     type: "function",
   },
 ] as const; // Add 'as const' for better type inference with viem
@@ -74,6 +243,58 @@ const ERC20_ABI = [
     type: "function",
   },
 ] as const;
+
+/**
+ * Fetch all streams where the user is the employee.
+ * Strategy:
+ * 1. Filter 'StreamCreated' events where 'employee' == userAddress.
+ * 2. Extract streamIds.
+ * 3. Fetch current stream details for each ID.
+ */
+export async function getEmployeeStreams(
+  contractAddress: Address,
+  employeeAddress: Address,
+  publicClient: any // Pass the public client from wagmi/viem
+) {
+  console.log(`🔍 Fetching streams for employee: ${employeeAddress}`);
+
+  // 1. Get Logs (Indexed Query)
+  // We look for StreamCreated events where the 3rd indexed argument (employee) matches
+  const logs = await publicClient.getLogs({
+    address: contractAddress,
+    event: parseAbiItem('event StreamCreated(uint256 indexed streamId, address indexed company, address indexed employee, address token, uint256 streamAmount, uint256 escrowAmount, uint64 startTime, uint64 stopTime)'),
+    args: {
+      employee: employeeAddress,
+    },
+    fromBlock: 'earliest', // Or a specific deployment block to save RPC calls
+  });
+
+  console.log(`Found ${logs.length} stream creation events.`);
+
+  // 2. Extract Stream IDs
+  const streamIds = logs.map((log: any) => log.args.streamId);
+
+  // 3. Fetch Details (in parallel)
+  // Note: In a production app, you might want to use multicall here
+  const streamDetailsPromises = streamIds.map((id: bigint) =>
+    publicClient.readContract({
+      address: contractAddress,
+      abi: PAYSTREAM_ABI,
+      functionName: 'getStream',
+      args: [id],
+    })
+  );
+
+  const streams = await Promise.all(streamDetailsPromises);
+
+  // Combine ID with data
+  return streams.map((stream: any, index: number) => ({
+    streamId: streamIds[index].toString(),
+    ...stream,
+  }));
+}
+
+import { parseAbiItem } from "viem";
 
 /**
  * Approve tokens for the Paystream contract
@@ -386,7 +607,7 @@ export async function submitMilestone(
       address: contractAddress,
       abi: PAYSTREAM_ABI,
       functionName: "submitMilestone",
-      args: [BigInt(streamId), amountInWei, descriptionHash],
+      args: [BigInt(streamId), amountInWei],
     });
 
     console.log(`📤 Milestone submission transaction sent: ${hash}`);

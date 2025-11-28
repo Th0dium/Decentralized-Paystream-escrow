@@ -5,6 +5,7 @@ import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { useAuth } from "@/lib/hooks";
 import { useMyPayments } from "@/lib/hooks/useMyPayments";
+import { useMyMilestones, MilestoneStatus } from "@/lib/hooks/useMyMilestones";
 import { formatUnits } from "viem";
 import { approveMilestone, rejectMilestone } from "@/lib/contract-interaction";
 
@@ -12,8 +13,9 @@ const ITEMS_PER_PAGE = 10;
 
 export default function AuditorMilestonesPage() {
   const { walletAddress, isAuditor } = useAuth();
-  const { asAuditor: auditorStreams, isLoading: loading } = useMyPayments(walletAddress as any);
-  const [selectedMilestoneId] = useState<number | null>(null);
+  const { asAuditor: auditorStreams, isLoading: streamsLoading } = useMyPayments(walletAddress as any);
+  const { milestones, isLoading: milestonesLoading } = useMyMilestones(walletAddress as any, 'auditor');
+  
   const [reviewingId, setReviewingId] = useState<number | null>(null);
   const [reviewAction, setReviewAction] = useState<"approve" | "reject" | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -37,34 +39,33 @@ export default function AuditorMilestonesPage() {
         await rejectMilestone(contractAddress as any, milestoneIdStr);
       }
 
-      // Refetch after action
+      // Refetch or reload
       setTimeout(() => window.location.reload(), 2000);
     } catch (error) {
       console.error(`Failed to ${action} milestone:`, error);
+      alert(`Failed to ${action}: ` + (error instanceof Error ? error.message : "Unknown error"));
     } finally {
       setReviewingId(null);
       setReviewAction(null);
     }
   };
 
-  // For now, auditor milestones would be fetched from the auditor streams
-  // This is a simplified view - in a full implementation you'd fetch milestone details
-  const pendingMilestones: any[] = [];
-  const reviewedMilestones: any[] = [];
+  // Filter Pending Milestones
+  const pendingMilestones = milestones.filter(m => m.status === MilestoneStatus.PENDING);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-lg text-slate-400">Loading auditor streams...</div>
-      </div>
-    );
-  }
-
-  // Pagination
+  // Pagination for Streams
   const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIdx = startIdx + ITEMS_PER_PAGE;
   const paginatedStreams = auditorStreams.slice(startIdx, endIdx);
   const totalPages = Math.ceil(auditorStreams.length / ITEMS_PER_PAGE);
+
+  if (streamsLoading || milestonesLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-lg text-slate-400">Loading auditor dashboard...</div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -78,7 +79,74 @@ export default function AuditorMilestonesPage() {
         </div>
       )}
 
-      {/* Streams Summary */}
+      {/* PENDING MILESTONES SECTION */}
+      <div className="mb-12">
+        <h2 className="text-2xl font-semibold mb-6 text-slate-100">
+          Pending Approvals ({pendingMilestones.length})
+        </h2>
+
+        {pendingMilestones.length === 0 ? (
+            <Card>
+                <p className="text-center text-slate-400 py-8">
+                    No pending milestones to review.
+                </p>
+            </Card>
+        ) : (
+            <div className="space-y-4">
+                {pendingMilestones.map((milestone) => (
+                    <Card key={milestone.milestoneId}>
+                        <div className="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 className="text-xl font-semibold text-slate-100">
+                                    Milestone #{milestone.milestoneId}
+                                </h3>
+                                <p className="text-sm text-slate-400">
+                                    Stream #{milestone.streamId} • Submitter: {milestone.submitter.slice(0,6)}...{milestone.submitter.slice(-4)}
+                                </p>
+                            </div>
+                            <span className="px-3 py-1 rounded-full text-sm font-medium bg-yellow-900/30 text-yellow-300">
+                                Pending Review
+                            </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <div className="text-sm text-slate-400">Amount Requested</div>
+                                <div className="text-lg font-semibold text-slate-100">
+                                    {formatUnits(milestone.amount, 18)} tokens
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-sm text-slate-400">Submitted Date</div>
+                                <div className="text-sm font-semibold text-slate-100">
+                                    {new Date(milestone.createdAt * 1000).toLocaleDateString()}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-4">
+                             <Button 
+                                className="flex-1 bg-green-600 hover:bg-green-700"
+                                disabled={reviewingId === milestone.milestoneId}
+                                onClick={() => handleReviewMilestone(milestone.milestoneId, "approve")}
+                             >
+                                {reviewingId === milestone.milestoneId && reviewAction === "approve" ? "Approving..." : "Approve"}
+                             </Button>
+                             <Button 
+                                className="flex-1 bg-red-600 hover:bg-red-700"
+                                disabled={reviewingId === milestone.milestoneId}
+                                onClick={() => handleReviewMilestone(milestone.milestoneId, "reject")}
+                             >
+                                {reviewingId === milestone.milestoneId && reviewAction === "reject" ? "Rejecting..." : "Reject"}
+                             </Button>
+                        </div>
+                    </Card>
+                ))}
+            </div>
+        )}
+      </div>
+
+      {/* STREAMS SUMMARY */}
       <div className="mb-12">
         <h2 className="text-2xl font-semibold mb-6 text-slate-100">
           Assigned Streams ({auditorStreams.length})
@@ -174,15 +242,6 @@ export default function AuditorMilestonesPage() {
           </>
         )}
       </div>
-
-      {/* Info Box */}
-      <Card>
-        <h3 className="text-lg font-semibold mb-2 text-slate-100">About Auditor Role</h3>
-        <p className="text-slate-400 text-sm">
-          As an auditor, you are assigned to specific streams to review and approve/reject milestones submitted by employees.
-          Use the streams listed above to manage your auditing responsibilities. When employees submit milestones, they will appear in the contract for your review.
-        </p>
-      </Card>
     </div>
   );
 }
