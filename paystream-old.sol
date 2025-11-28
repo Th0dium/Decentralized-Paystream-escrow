@@ -8,14 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title Paystream
- * @dev A unified contract for streaming payments with optional milestone-based escrow.
- * Users specify:
- * - streamAmount: Amount to stream continuously
- * - escrowAmount: Initial escrow amount locked for milestones
- *
- * When employee withdraws from stream, the escrowAmount stays locked.
- * Employee submits milestones to claim from escrowed funds.
- *
+ * @dev A unified, single-deployment contract for streaming payments and milestone-based escrow.
  * Administrative functions are controlled by the DEFAULT_ADMIN_ROLE.
  */
 contract Paystream is ReentrancyGuard, AccessControl {
@@ -34,13 +27,13 @@ contract Paystream is ReentrancyGuard, AccessControl {
         address company;
         address employee;
         IERC20 token;
-        uint256 streamAmount; // Amount for continuous streaming
-        uint256 escrowAmount; // Initial escrow amount locked for milestones
+        uint256 totalAmount; // Total funded by company for the stream
         uint64 startTime;
         uint64 stopTime;
         uint64 lastWithdrawTime;
-        uint256 withdrawn; // Total withdrawn from stream
-        uint256 escrowed; // Current amount locked in escrow (starts at escrowAmount)
+        uint256 withdrawn; // Total withdrawn (payout + escrowed)
+        uint16 escrowBps; // Basis points to lock (e.g., 3000 = 30%)
+        uint256 escrowed; // Amount currently locked in escrow
         bool paused; // Stream-specific pause by company
         bool cancelled;
         uint64 totalPausedDuration; // Cumulative duration of all completed pauses
@@ -64,16 +57,14 @@ contract Paystream is ReentrancyGuard, AccessControl {
     mapping(uint256 => Milestone) public milestones;
     mapping(uint256 => uint256[]) public streamMilestones;
     mapping(address => uint256[]) public employeeMilestones;
-    mapping(address => uint256[]) public companyStreams;
-    mapping(address => uint256[]) public employeeStreams;
 
     // --- Stream-Specific Roles ---
     mapping(uint256 => mapping(address => bool)) public isStreamAuditor;
-    mapping(address => uint256[]) public auditorStreams;
 
     // --- Admin-Controlled State ---
     bool public newStreamsPaused;
-    mapping(address => bool) public isTokenWhitelisted;
+    uint16 public platformFeeBps;
+    address public feeRecipient;
 
     // --- Validation Bounds ---
     uint256 public constant MIN_STREAM_DURATION = 1 days;
@@ -81,8 +72,9 @@ contract Paystream is ReentrancyGuard, AccessControl {
     uint256 public constant MIN_STREAM_AMOUNT = 1000; // 0.000000000001 tokens (wei)
 
     // ============ Events ============
+    event PlatformFeeUpdated(uint16 newFeeBps);
+    event FeeRecipientUpdated(address indexed newRecipient);
     event NewStreamCreationPaused(bool status);
-    event TokenWhitelistUpdated(address indexed token, bool isWhitelisted);
 
     event StreamAuditorAdded(uint256 indexed streamId, address indexed auditor);
     event StreamAuditorRemoved(
@@ -95,24 +87,25 @@ contract Paystream is ReentrancyGuard, AccessControl {
         address indexed company,
         address indexed employee,
         address token,
-        uint256 streamAmount,
-        uint256 escrowAmount,
+        uint256 totalAmount,
         uint64 startTime,
-        uint64 stopTime
+        uint64 stopTime,
+        uint16 escrowBps,
+        uint256 feeAmount
     );
 
     event Withdrawn(
         uint256 indexed streamId,
         address indexed employee,
-        uint256 amount
+        uint256 payout,
+        uint256 escrowed
     );
     event StreamPaused(uint256 indexed streamId, address indexed by);
     event StreamResumed(uint256 indexed streamId, address indexed by);
     event StreamCancelled(
         uint256 indexed streamId,
         address indexed by,
-        uint256 refundedStream,
-        uint256 refundedEscrow
+        uint256 refunded
     );
 
     event MilestoneSubmitted(
@@ -141,32 +134,8 @@ contract Paystream is ReentrancyGuard, AccessControl {
     // ============ Constructor ============
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-
-        // USDC Mainnet: 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
-        isTokenWhitelisted[
-            address(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48)
-        ] = true;
-        // USDT Mainnet: 0xdAC17F958D2ee523a2206206994597C13D831ec7
-        isTokenWhitelisted[
-            address(0xdAC17F958D2ee523a2206206994597C13D831ec7)
-        ] = true;
-        // DAI Mainnet: 0x6B175474E89094C44Da98b954EedeAC495271d0F
-        isTokenWhitelisted[
-            address(0x6B175474E89094C44Da98b954EedeAC495271d0F)
-        ] = true;
-
-        // USDC Sepolia: 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238
-        isTokenWhitelisted[
-            address(0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238)
-        ] = true;
-        // USDT Sepolia: 0xaA8E23Fb1079EA71e0a56F48a2aA51851D8433D0
-        isTokenWhitelisted[
-            address(0xaA8E23Fb1079EA71e0a56F48a2aA51851D8433D0)
-        ] = true;
-        // DAI Sepolia: 0xff34B3d4aEE5D82176C1E28c29d5cc3d426eb39D
-        isTokenWhitelisted[
-            address(0xff34B3d4aEE5D82176C1E28c29d5cc3d426eb39D)
-        ] = true;
+        platformFeeBps = 5; // Default 0.05%
+        feeRecipient = msg.sender; // Default to deployer
     }
 
     // ============ Admin Functions ============
@@ -182,57 +151,70 @@ contract Paystream is ReentrancyGuard, AccessControl {
     }
 
     /**
-     * @notice Add or remove a token from the whitelist (admin only)
-     * @param token The ERC20 token address
-     * @param whitelisted The desired whitelist status
+     * @notice Sets the platform fee.
+     * @param newFeeBps The new fee in basis points.
      */
-    function updateTokenWhitelist(
-        address token,
-        bool whitelisted
+    function setPlatformFee(
+        uint16 newFeeBps
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(token != address(0), "invalid token address");
-        isTokenWhitelisted[token] = whitelisted;
-        emit TokenWhitelistUpdated(token, whitelisted);
+        require(newFeeBps <= 10000, "fee cannot exceed 10000");
+        platformFeeBps = newFeeBps;
+        emit PlatformFeeUpdated(newFeeBps);
+    }
+
+    /**
+     * @notice Sets the recipient for platform fees.
+     * @param newRecipient The new address to receive fees.
+     */
+    function setFeeRecipient(
+        address newRecipient
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(newRecipient != address(0), "recipient cannot be zero");
+        feeRecipient = newRecipient;
+        emit FeeRecipientUpdated(newRecipient);
     }
 
     // ============ Stream Creation ============
     /**
-     * @notice Create a new salary stream. The caller must have approved tokens.
+     * @notice Create a new salary stream. The caller must have approved (totalAmount + fee) tokens.
      * @param employee Address receiving the stream
      * @param token ERC20 token address
-     * @param streamAmount Amount to stream continuously over duration
-     * @param escrowAmount Amount to lock in escrow for milestones
+     * @param totalAmount Total to stream over duration (excluding platform fee)
      * @param startTime Stream start timestamp
      * @param stopTime Stream end timestamp
+     * @param escrowBps Basis points to lock in escrow (e.g., 3000 = 30%)
      * @return streamId The created stream ID
      */
     function createStream(
         address employee,
         address token,
-        uint256 streamAmount,
-        uint256 escrowAmount,
+        uint256 totalAmount,
         uint64 startTime,
-        uint64 stopTime
+        uint64 stopTime,
+        uint16 escrowBps
     ) external nonReentrant returns (uint256) {
-        require(isTokenWhitelisted[token], "token not whitelisted");
         require(!newStreamsPaused, "stream creation is paused");
         require(employee != address(0), "invalid employee");
-        require(employee != msg.sender, "company cannot be employee");
         require(token != address(0), "invalid token");
-        require(
-            streamAmount >= MIN_STREAM_AMOUNT || escrowAmount >= MIN_STREAM_AMOUNT,
-            "amount too small"
-        );
+        require(totalAmount >= MIN_STREAM_AMOUNT, "amount too small");
         require(stopTime > startTime, "stop time must be after start time");
 
         uint64 duration = stopTime - startTime;
         require(duration >= MIN_STREAM_DURATION, "duration too short");
         require(duration <= MAX_STREAM_DURATION, "duration too long");
+        require(escrowBps <= 10000, "escrow bps cannot exceed 10000");
 
-        uint256 totalAmount = streamAmount + escrowAmount;
+        // --- Fee Calculation ---
+        uint256 feeAmount = 0;
+        if (platformFeeBps > 0 && feeRecipient != address(0)) {
+            feeAmount = (totalAmount * platformFeeBps) / 10000;
+        }
 
         // --- Fund Transfers ---
         IERC20 erc20 = IERC20(token);
+        if (feeAmount > 0) {
+            erc20.safeTransferFrom(msg.sender, feeRecipient, feeAmount);
+        }
         erc20.safeTransferFrom(msg.sender, address(this), totalAmount);
 
         // --- Stream Creation ---
@@ -241,31 +223,29 @@ contract Paystream is ReentrancyGuard, AccessControl {
             company: msg.sender,
             employee: employee,
             token: erc20,
-            streamAmount: streamAmount,
-            escrowAmount: escrowAmount,
+            totalAmount: totalAmount,
             startTime: startTime,
             stopTime: stopTime,
             lastWithdrawTime: startTime,
             withdrawn: 0,
-            escrowed: escrowAmount, // Initialize escrowed with escrowAmount
+            escrowBps: escrowBps,
+            escrowed: 0,
             paused: false,
             cancelled: false,
             totalPausedDuration: 0,
             pausedAt: 0
         });
 
-        employeeStreams[employee].push(streamId);
-        companyStreams[msg.sender].push(streamId);
-
         emit StreamCreated(
             streamId,
             msg.sender,
             employee,
             token,
-            streamAmount,
-            escrowAmount,
+            totalAmount,
             startTime,
-            stopTime
+            stopTime,
+            escrowBps,
+            feeAmount
         );
         return streamId;
     }
@@ -276,25 +256,16 @@ contract Paystream is ReentrancyGuard, AccessControl {
         require(s.company != address(0), "stream does not exist");
         require(msg.sender == s.company, "not stream company");
         require(auditor != address(0), "auditor address cannot be zero");
-        require(auditor != s.employee, "auditor cannot be employee");
-
-        if (!isStreamAuditor[streamId][auditor]) {
-            isStreamAuditor[streamId][auditor] = true;
-            auditorStreams[auditor].push(streamId);
-            emit StreamAuditorAdded(streamId, auditor);
-        }
+        isStreamAuditor[streamId][auditor] = true;
+        emit StreamAuditorAdded(streamId, auditor);
     }
 
     function removeStreamAuditor(uint256 streamId, address auditor) external {
         Stream storage s = streams[streamId];
         require(s.company != address(0), "stream does not exist");
         require(msg.sender == s.company, "not stream company");
-
-        if (isStreamAuditor[streamId][auditor]) {
-            isStreamAuditor[streamId][auditor] = false;
-            _removeFromArray(auditorStreams[auditor], streamId);
-            emit StreamAuditorRemoved(streamId, auditor);
-        }
+        isStreamAuditor[streamId][auditor] = false;
+        emit StreamAuditorRemoved(streamId, auditor);
     }
 
     // ============ Core Stream Interaction (Withdraw, Pause, etc.) ============
@@ -307,7 +278,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
         if (nowTs < s.startTime) return 0;
 
         uint64 totalDuration = s.stopTime - s.startTime;
-        if (totalDuration == 0) return s.streamAmount - s.withdrawn;
+        if (totalDuration == 0) return s.totalAmount - s.withdrawn;
 
         uint64 rawElapsed = nowTs > s.stopTime
             ? totalDuration
@@ -320,8 +291,8 @@ contract Paystream is ReentrancyGuard, AccessControl {
             ? rawElapsed - totalPausedTime
             : 0;
 
-        uint256 accrued = (s.streamAmount * workingTime) / totalDuration;
-        if (accrued > s.streamAmount) accrued = s.streamAmount;
+        uint256 accrued = (s.totalAmount * workingTime) / totalDuration;
+        if (accrued > s.totalAmount) accrued = s.totalAmount;
 
         if (accrued <= s.withdrawn) return 0;
         return accrued - s.withdrawn;
@@ -337,12 +308,18 @@ contract Paystream is ReentrancyGuard, AccessControl {
         uint256 amount = claimable(streamId);
         require(amount > 0, "nothing to withdraw");
 
+        uint256 escrowAmount = (amount * s.escrowBps) / 10000;
+        uint256 payout = amount - escrowAmount;
+
         s.withdrawn += amount;
         s.lastWithdrawTime = uint64(block.timestamp);
+        s.escrowed += escrowAmount;
 
-        s.token.safeTransfer(s.employee, amount);
+        if (payout > 0) {
+            s.token.safeTransfer(s.employee, payout);
+        }
 
-        emit Withdrawn(streamId, s.employee, amount);
+        emit Withdrawn(streamId, s.employee, payout, escrowAmount);
     }
 
     function pauseStream(uint256 streamId) external {
@@ -379,18 +356,13 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
         s.cancelled = true;
 
-        // Refund unvested stream amount and all remaining escrow
-        uint256 refundStream = s.streamAmount - s.withdrawn;
-        uint256 refundEscrow = s.escrowed;
-
-        if (refundStream > 0) {
-            s.token.safeTransfer(s.company, refundStream);
-        }
-        if (refundEscrow > 0) {
-            s.token.safeTransfer(s.company, refundEscrow);
+        // The remaining unvested and unwithdrawn amount is refunded to the company.
+        uint256 refundAmount = s.totalAmount - s.withdrawn; // Corrected logic
+        if (refundAmount > 0) {
+            s.token.safeTransfer(s.company, refundAmount);
         }
 
-        emit StreamCancelled(streamId, msg.sender, refundStream, refundEscrow);
+        emit StreamCancelled(streamId, msg.sender, refundAmount);
     }
 
     // ============ Milestone Management ============
@@ -464,25 +436,6 @@ contract Paystream is ReentrancyGuard, AccessControl {
         emit MilestoneClaimed(milestoneId, m.streamId, m.submitter, m.amount);
     }
 
-    // ============ Internal Helper ============
-    /**
-     * @dev Internal helper to remove a value from a uint256 array.
-     * Swaps the element to delete with the last element, then pops.
-     * Order is NOT preserved.
-     */
-    function _removeFromArray(uint256[] storage array, uint256 value) internal {
-        uint256 length = array.length;
-        for (uint256 i = 0; i < length; i++) {
-            if (array[i] == value) {
-                if (i != length - 1) {
-                    array[i] = array[length - 1];
-                }
-                array.pop();
-                break;
-            }
-        }
-    }
-
     // ============ View Functions ============
     function getStream(uint256 streamId) external view returns (Stream memory) {
         return streams[streamId];
@@ -506,24 +459,6 @@ contract Paystream is ReentrancyGuard, AccessControl {
         return employeeMilestones[employee];
     }
 
-    function getEmployeeStreams(
-        address employee
-    ) external view returns (uint256[] memory) {
-        return employeeStreams[employee];
-    }
-
-    function getCompanyStreams(
-        address company
-    ) external view returns (uint256[] memory) {
-        return companyStreams[company];
-    }
-
-    function getAuditorStreams(
-        address auditor
-    ) external view returns (uint256[] memory) {
-        return auditorStreams[auditor];
-    }
-
     function getEscrowedAmount(
         uint256 streamId
     ) external view returns (uint256) {
@@ -537,7 +472,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
         if (nowTs < s.startTime) return 0;
 
         uint64 totalDuration = s.stopTime - s.startTime;
-        if (totalDuration == 0) return s.streamAmount;
+        if (totalDuration == 0) return s.totalAmount;
 
         uint64 rawElapsed = nowTs > s.stopTime
             ? totalDuration
@@ -550,8 +485,8 @@ contract Paystream is ReentrancyGuard, AccessControl {
             ? rawElapsed - totalPausedTime
             : 0;
 
-        uint256 accrued = (s.streamAmount * workingTime) / totalDuration;
-        if (accrued > s.streamAmount) accrued = s.streamAmount;
+        uint256 accrued = (s.totalAmount * workingTime) / totalDuration;
+        if (accrued > s.totalAmount) accrued = s.totalAmount;
 
         return accrued;
     }
