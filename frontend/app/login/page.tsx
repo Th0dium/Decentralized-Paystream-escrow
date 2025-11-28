@@ -182,7 +182,7 @@ export default function LoginPage() {
                 className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl transition-all duration-200 shadow-lg hover:shadow-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed group"
               >
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0">
                     <svg className="w-6 h-6" viewBox="0 0 40 40" fill="none">
                       <path
                         d="M38.67 10.34l-14.12-8.4a3.33 3.33 0 00-3.33 0L6.67 10.34a3.33 3.33 0 00-1.67 2.89v8.4a3.33 3.33 0 001.67 2.89l14.12 8.4a3.33 3.33 0 003.33 0l14.12-8.4a3.33 3.33 0 001.67-2.89v-8.4a3.33 3.33 0 00-1.67-2.89z"
