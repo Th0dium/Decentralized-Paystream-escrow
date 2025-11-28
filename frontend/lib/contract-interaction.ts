@@ -239,3 +239,254 @@ export async function checkTokenWhitelisted(
         return false;
     }
 }
+
+// ============ STREAM MANAGEMENT FUNCTIONS ============
+
+/**
+ * Withdraw vested funds from a payment stream
+ */
+export async function withdrawStream(
+  contractAddress: Address,
+  streamId: string
+): Promise<{ transactionHash: string }> {
+  console.log("\n💰 === WITHDRAW STREAM ===");
+  console.log(`📍 Stream ID: ${streamId}`);
+
+  try {
+    const hash = await writeContract(config, {
+      address: contractAddress,
+      abi: PAYSTREAM_ABI,
+      functionName: "withdrawPayment",
+      args: [BigInt(streamId)],
+    });
+
+    console.log(`📤 Withdrawal transaction sent: ${hash}`);
+    const receipt = await waitForTransactionReceipt(config, { hash });
+    console.log(`✅ Withdrawal confirmed in block ${receipt.blockNumber}`);
+
+    return { transactionHash: hash };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : "Withdrawal failed";
+    console.error("❌ Error withdrawing from stream:", errorMsg);
+    throw new Error(errorMsg);
+  }
+}
+
+/**
+ * Pause a payment stream
+ */
+export async function pauseStream(
+  contractAddress: Address,
+  streamId: string
+): Promise<{ transactionHash: string }> {
+  console.log("\n⏸️ === PAUSE STREAM ===");
+  console.log(`📍 Stream ID: ${streamId}`);
+
+  try {
+    const hash = await writeContract(config, {
+      address: contractAddress,
+      abi: PAYSTREAM_ABI,
+      functionName: "pausePayment",
+      args: [BigInt(streamId)],
+    });
+
+    console.log(`📤 Pause transaction sent: ${hash}`);
+    const receipt = await waitForTransactionReceipt(config, { hash });
+    console.log(`✅ Stream paused in block ${receipt.blockNumber}`);
+
+    return { transactionHash: hash };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : "Pause failed";
+    console.error("❌ Error pausing stream:", errorMsg);
+    throw new Error(errorMsg);
+  }
+}
+
+/**
+ * Resume a paused payment stream
+ */
+export async function resumeStream(
+  contractAddress: Address,
+  streamId: string
+): Promise<{ transactionHash: string }> {
+  console.log("\n▶️ === RESUME STREAM ===");
+  console.log(`📍 Stream ID: ${streamId}`);
+
+  try {
+    const hash = await writeContract(config, {
+      address: contractAddress,
+      abi: PAYSTREAM_ABI,
+      functionName: "resumePayment",
+      args: [BigInt(streamId)],
+    });
+
+    console.log(`📤 Resume transaction sent: ${hash}`);
+    const receipt = await waitForTransactionReceipt(config, { hash });
+    console.log(`✅ Stream resumed in block ${receipt.blockNumber}`);
+
+    return { transactionHash: hash };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : "Resume failed";
+    console.error("❌ Error resuming stream:", errorMsg);
+    throw new Error(errorMsg);
+  }
+}
+
+/**
+ * Cancel a payment stream and refund remaining balance
+ */
+export async function cancelStream(
+  contractAddress: Address,
+  streamId: string
+): Promise<{ transactionHash: string }> {
+  console.log("\n❌ === CANCEL STREAM ===");
+  console.log(`📍 Stream ID: ${streamId}`);
+
+  try {
+    const hash = await writeContract(config, {
+      address: contractAddress,
+      abi: PAYSTREAM_ABI,
+      functionName: "cancelPayment",
+      args: [BigInt(streamId)],
+    });
+
+    console.log(`📤 Cancel transaction sent: ${hash}`);
+    const receipt = await waitForTransactionReceipt(config, { hash });
+    console.log(`✅ Stream cancelled in block ${receipt.blockNumber}`);
+
+    return { transactionHash: hash };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : "Cancellation failed";
+    console.error("❌ Error cancelling stream:", errorMsg);
+    throw new Error(errorMsg);
+  }
+}
+
+// ============ MILESTONE FUNCTIONS ============
+
+/**
+ * Submit a milestone for approval
+ */
+export async function submitMilestone(
+  contractAddress: Address,
+  streamId: string,
+  amount: string,
+  descriptionHash: string,
+  tokenDecimals: number = 18
+): Promise<{ transactionHash: string }> {
+  const amountInWei = parseUnits(amount, tokenDecimals);
+
+  console.log("\n📤 === SUBMIT MILESTONE ===");
+  console.log(`📍 Stream ID: ${streamId}`);
+  console.log(`💰 Amount: ${amount} (${amountInWei} wei)`);
+  console.log(`📄 Description Hash: ${descriptionHash}`);
+
+  try {
+    const hash = await writeContract(config, {
+      address: contractAddress,
+      abi: PAYSTREAM_ABI,
+      functionName: "submitMilestone",
+      args: [BigInt(streamId), amountInWei, descriptionHash],
+    });
+
+    console.log(`📤 Milestone submission transaction sent: ${hash}`);
+    const receipt = await waitForTransactionReceipt(config, { hash });
+    console.log(`✅ Milestone submitted in block ${receipt.blockNumber}`);
+
+    return { transactionHash: hash };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : "Milestone submission failed";
+    console.error("❌ Error submitting milestone:", errorMsg);
+    throw new Error(errorMsg);
+  }
+}
+
+/**
+ * Approve a submitted milestone (auditor only)
+ */
+export async function approveMilestone(
+  contractAddress: Address,
+  milestoneId: string
+): Promise<{ transactionHash: string }> {
+  console.log("\n✅ === APPROVE MILESTONE ===");
+  console.log(`📍 Milestone ID: ${milestoneId}`);
+
+  try {
+    const hash = await writeContract(config, {
+      address: contractAddress,
+      abi: PAYSTREAM_ABI,
+      functionName: "approveMilestone",
+      args: [BigInt(milestoneId)],
+    });
+
+    console.log(`📤 Approve transaction sent: ${hash}`);
+    const receipt = await waitForTransactionReceipt(config, { hash });
+    console.log(`✅ Milestone approved in block ${receipt.blockNumber}`);
+
+    return { transactionHash: hash };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : "Milestone approval failed";
+    console.error("❌ Error approving milestone:", errorMsg);
+    throw new Error(errorMsg);
+  }
+}
+
+/**
+ * Reject a submitted milestone (auditor only)
+ */
+export async function rejectMilestone(
+  contractAddress: Address,
+  milestoneId: string
+): Promise<{ transactionHash: string }> {
+  console.log("\n❌ === REJECT MILESTONE ===");
+  console.log(`📍 Milestone ID: ${milestoneId}`);
+
+  try {
+    const hash = await writeContract(config, {
+      address: contractAddress,
+      abi: PAYSTREAM_ABI,
+      functionName: "rejectMilestone",
+      args: [BigInt(milestoneId)],
+    });
+
+    console.log(`📤 Reject transaction sent: ${hash}`);
+    const receipt = await waitForTransactionReceipt(config, { hash });
+    console.log(`✅ Milestone rejected in block ${receipt.blockNumber}`);
+
+    return { transactionHash: hash };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : "Milestone rejection failed";
+    console.error("❌ Error rejecting milestone:", errorMsg);
+    throw new Error(errorMsg);
+  }
+}
+
+/**
+ * Claim funds from an approved milestone
+ */
+export async function claimMilestone(
+  contractAddress: Address,
+  milestoneId: string
+): Promise<{ transactionHash: string }> {
+  console.log("\n🎯 === CLAIM MILESTONE ===");
+  console.log(`📍 Milestone ID: ${milestoneId}`);
+
+  try {
+    const hash = await writeContract(config, {
+      address: contractAddress,
+      abi: PAYSTREAM_ABI,
+      functionName: "claimMilestone",
+      args: [BigInt(milestoneId)],
+    });
+
+    console.log(`📤 Claim transaction sent: ${hash}`);
+    const receipt = await waitForTransactionReceipt(config, { hash });
+    console.log(`✅ Milestone claimed in block ${receipt.blockNumber}`);
+
+    return { transactionHash: hash };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : "Milestone claim failed";
+    console.error("❌ Error claiming milestone:", errorMsg);
+    throw new Error(errorMsg);
+  }
+}
