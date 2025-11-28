@@ -99,10 +99,10 @@ export default function DashboardPage() {
               <ul className="space-y-2">
                 <li>
                   <Link
-                    href="/dashboard/company/create-stream"
+                    href="/dashboard/company/create-payment"
                     className="text-blue-400 hover:text-blue-300 underline"
                   >
-                    Create Stream →
+                    Create Payment →
                   </Link>
                 </li>
                 {role === "COMPANY" && (

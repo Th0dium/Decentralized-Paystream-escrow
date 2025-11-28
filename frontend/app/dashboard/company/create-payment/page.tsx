@@ -5,16 +5,9 @@ import { useAccount } from "wagmi";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { TokenSelector } from "@/components/TokenSelector";
-import { approveTokens, createStream, createEscrow, checkTokenWhitelisted } from "@/lib/contract-interaction";
+import { approveTokens, createStream, checkTokenWhitelisted } from "@/lib/contract-interaction";
 import { Token, WHITELISTED_TOKENS } from "@/lib/tokens";
 import { Address } from "viem";
-
-interface EscrowItem {
-  id: string;
-  amount: string;
-  deadline: string;
-  description: string;
-}
 
 export default function CreateStreamPage() {
   const { address: account, chainId, isConnected } = useAccount();
@@ -26,11 +19,9 @@ export default function CreateStreamPage() {
     employeeAddress: "",
     paystreamAmount: "",
     paystreamDuration: 30, // days
+    escrowAmount: "",
+    escrowDescription: "",
   });
-
-  const [escrowItems, setEscrowItems] = useState<EscrowItem[]>([
-    { id: "1", amount: "", deadline: "", description: "" },
-  ]);
 
   const [selectedToken, setSelectedToken] = useState<Token>(WHITELISTED_TOKENS[0]);
   const [showTokenSelector, setShowTokenSelector] = useState(false);
@@ -83,40 +74,16 @@ export default function CreateStreamPage() {
   }, [selectedToken, isCorrectNetwork]);
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]:
-        name === "employeeAddress" || name === "paystreamAmount"
+        name === "employeeAddress" || name === "paystreamAmount" || name === "escrowAmount" || name === "escrowDescription"
           ? value
           : parseInt(value),
     }));
-  };
-
-  const handleEscrowItemChange = (
-    id: string,
-    field: keyof EscrowItem,
-    value: string
-  ) => {
-    setEscrowItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
-    );
-  };
-
-  const addEscrowItem = () => {
-    const newId = String(Math.max(...escrowItems.map((i) => parseInt(i.id) || 0)) + 1);
-    setEscrowItems((prev) => [
-      ...prev,
-      { id: newId, amount: "", deadline: "", description: "" },
-    ]);
-  };
-
-  const removeEscrowItem = (id: string) => {
-    if (escrowItems.length > 1) {
-      setEscrowItems((prev) => prev.filter((item) => item.id !== id));
-    }
   };
 
   const handleTokenChange = (token: Token) => {
@@ -157,21 +124,13 @@ export default function CreateStreamPage() {
     }
 
     if (enableEscrow) {
-      if (escrowItems.length === 0) {
-        setError("Please add at least one escrow milestone");
+      if (!formData.escrowAmount || parseFloat(formData.escrowAmount) <= 0) {
+        setError("Please enter a valid escrow amount");
         return;
       }
-
-      for (const item of escrowItems) {
-        if (!item.amount || parseFloat(item.amount) <= 0) {
-          setError("All escrow milestones must have a valid amount");
-          return;
-        }
-        if (!item.description) {
-          setError("All escrow milestones must have a description");
-          return;
-        }
-        // Note: Deadline is stored for UI but not currently used in contract call (no deadline param in createEscrow)
+      if (!formData.escrowDescription) {
+        setError("Please enter an escrow description");
+        return;
       }
     }
 
@@ -187,7 +146,7 @@ export default function CreateStreamPage() {
 
       // Calculate total amount from paystream and escrow
       const paystreamAmt = enablePaystream ? parseFloat(formData.paystreamAmount || "0") : 0;
-      const escrowAmt = escrowItems.reduce((sum, item) => sum + parseFloat(item.amount || "0"), 0);
+      const escrowAmt = enableEscrow ? parseFloat(formData.escrowAmount || "0") : 0;
       const totalAmount = paystreamAmt + escrowAmt;
 
       console.log(`\n💰 Amount breakdown:`);
@@ -205,73 +164,52 @@ export default function CreateStreamPage() {
       );
       console.log(`✅ Approval hash: ${approvalHash}`);
 
-      let paymentId = "0";
-      let streamTxHash = null;
+      // Step 2: Create Payment Stream (with optional escrow built-in)
+      console.log("\n📝 Step 2: Creating payment stream...");
 
-      // Step 2: Create Paystream (if enabled)
-      if (enablePaystream) {
-        console.log("\n📝 Step 2: Creating payment stream...");
-        const duration = formData.paystreamDuration;
+      const streamAmountToUse = enablePaystream ? formData.paystreamAmount : "0";
+      const escrowAmountToUse = enableEscrow ? formData.escrowAmount : "0";
 
-        const result = await createStream(
-          contractAddress,
-          formData.employeeAddress as Address,
-          selectedToken.address as Address,
-          formData.paystreamAmount,
-          duration,
-          selectedToken.decimals
-        );
-        
-        streamTxHash = result.transactionHash;
-        if (result.streamId) {
-           paymentId = result.streamId;
-           console.log(`✅ Stream created with ID: ${paymentId}`);
-        } else {
-           console.warn("⚠️ Stream created but ID not found in logs. Escrows will be unlinked.");
+      const result = await createStream(
+        contractAddress,
+        formData.employeeAddress as Address,
+        selectedToken.address as Address,
+        streamAmountToUse,
+        escrowAmountToUse,
+        formData.paystreamDuration,
+        selectedToken.decimals
+      );
+
+      const streamTxHash = result.transactionHash;
+      const paymentId = result.streamId || "0";
+
+      if (result.streamId) {
+        console.log(`✅ Payment created with Stream ID: ${paymentId}`);
+        if (enablePaystream && enableEscrow) {
+          console.log(`   💰 Stream Amount: ${formData.paystreamAmount} ${selectedToken.symbol}`);
+          console.log(`   🎯 Escrow Amount: ${formData.escrowAmount} ${selectedToken.symbol} (locked for milestones)`);
+        } else if (enablePaystream) {
+          console.log(`   💰 Stream-only payment created`);
+        } else if (enableEscrow) {
+          console.log(`   🎯 Escrow-only payment created`);
         }
+      } else {
+        console.warn("⚠️ Payment created but Stream ID not found in logs.");
       }
 
-      // Step 3: Create Escrows (if enabled)
-      if (enableEscrow) {
-        console.log("\n📝 Step 3: Creating escrow milestones...");
-        
-        for (let i = 0; i < escrowItems.length; i++) {
-          const item = escrowItems[i];
-          console.log(`   Creating milestone ${i + 1}/${escrowItems.length}...`);
-          
-          // We don't need deadline for the contract call currently, just amount and description
-          const escrowResult = await createEscrow(
-            contractAddress,
-            formData.employeeAddress as Address,
-            selectedToken.address as Address,
-            item.amount,
-            item.description,
-            paymentId,
-            selectedToken.decimals
-          );
-          console.log(`   ✅ Milestone ${i + 1} created: ${escrowResult.transactionHash}`);
-          
-          // If this is the only transaction (no paystream), show this hash
-          if (!streamTxHash) {
-            streamTxHash = escrowResult.transactionHash;
-          }
-        }
-      }
+      console.log(`\n✅ Payment created successfully!`);
 
-      console.log(`\n✅ All operations completed successfully!`);
-      
-      setSuccess("Payment setup created successfully! Check Etherscan for transaction details.");
-      if (streamTxHash) {
-        setTransactionHash(streamTxHash);
-      }
+      setSuccess("Payment created successfully! Check Etherscan for transaction details.");
+      setTransactionHash(streamTxHash);
 
       // Reset form
       setFormData({
         employeeAddress: "",
         paystreamAmount: "",
         paystreamDuration: 30,
+        escrowAmount: "",
+        escrowDescription: "",
       });
-      setEscrowItems([{ id: "1", amount: "", deadline: "", description: "" }]);
       setEnablePaystream(true);
       setEnableEscrow(false);
       setSelectedToken(WHITELISTED_TOKENS[0]); // Reset to default
@@ -286,11 +224,8 @@ export default function CreateStreamPage() {
 
   const paystreamDurationInSeconds = formData.paystreamDuration * 24 * 60 * 60;
   const paystreamAmount = parseFloat(formData.paystreamAmount || "0") || 0;
-  const totalEscrowAmount = escrowItems.reduce(
-    (sum, item) => sum + (parseFloat(item.amount || "0") || 0),
-    0
-  );
-  const totalAmount = paystreamAmount + totalEscrowAmount;
+  const escrowAmount = parseFloat(formData.escrowAmount || "0") || 0;
+  const totalAmount = paystreamAmount + escrowAmount;
 
   if (!isConnected) {
     return (
@@ -438,73 +373,42 @@ export default function CreateStreamPage() {
                       </div>
                     </label>
                   </div>
-                  <div className={`p-4 space-y-3 max-h-96 overflow-y-auto ${!enableEscrow ? 'opacity-40 pointer-events-none' : ''}`}>
-                    <p className="text-sm text-slate-400">
-                      Configure milestones for escrow payment
-                    </p>
-
-                    {escrowItems.map((item, index) => (
-                      <div key={item.id} className="bg-slate-900 p-3 rounded-lg border border-slate-700">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="font-medium text-xs text-slate-200">Milestone {index + 1}</span>
-                          {escrowItems.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => removeEscrowItem(item.id)}
-                              disabled={!enableEscrow}
-                              className="text-red-400 hover:text-red-300 text-xs font-medium"
-                            >
-                              ✕
-                            </button>
-                          )}
-                        </div>
-
-                        <div className="space-y-2">
-                          <div>
-                            <label className="block text-xs font-medium mb-1 text-slate-300">Amount ({selectedToken.symbol})</label>
-                            <input
-                              type="number"
-                              value={item.amount}
-                              onChange={(e) => handleEscrowItemChange(item.id, "amount", e.target.value)}
-                              placeholder="0.0"
-                              step="0.001"
-                              disabled={!enableEscrow}
-                              className="input-base text-sm"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium mb-1 text-slate-300">Deadline</label>
-                            <input
-                              type="date"
-                              value={item.deadline}
-                              onChange={(e) => handleEscrowItemChange(item.id, "deadline", e.target.value)}
-                              disabled={!enableEscrow}
-                              className="input-base text-sm"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium mb-1 text-slate-300">Description</label>
-                            <textarea
-                              value={item.description}
-                              onChange={(e) => handleEscrowItemChange(item.id, "description", e.target.value)}
-                              placeholder="E.g., Complete phase 1"
-                              disabled={!enableEscrow}
-                              className="input-base text-sm"
-                              rows={2}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-
-                    <button
-                      type="button"
-                      onClick={addEscrowItem}
-                      disabled={!enableEscrow}
-                      className="w-full px-3 py-2 border border-purple-600 text-purple-400 font-medium rounded-lg hover:bg-purple-900/30 transition text-sm"
-                    >
-                      + Add Milestone
-                    </button>
+                  <div className={`p-4 space-y-4 ${!enableEscrow ? 'opacity-40 pointer-events-none' : ''}`}>
+                    <div>
+                      <label className="block text-sm font-medium mb-2 text-slate-200">
+                        Amount ({selectedToken.symbol})
+                      </label>
+                      <input
+                        type="number"
+                        name="escrowAmount"
+                        value={formData.escrowAmount}
+                        onChange={handleChange}
+                        placeholder="0.0"
+                        step="0.001"
+                        disabled={!enableEscrow}
+                        className="input-base"
+                      />
+                      <p className="text-xs text-slate-400 mt-1">
+                        Amount locked for milestone payment
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2 text-slate-200">
+                        Description
+                      </label>
+                      <textarea
+                        name="escrowDescription"
+                        value={formData.escrowDescription}
+                        onChange={handleChange}
+                        placeholder="E.g., Complete phase 1 deliverables"
+                        disabled={!enableEscrow}
+                        className="input-base"
+                        rows={3}
+                      />
+                      <p className="text-xs text-slate-400 mt-1">
+                        Describe the milestone or work to be completed
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -559,10 +463,10 @@ export default function CreateStreamPage() {
                   {enableEscrow && (
                     <div className="flex justify-between">
                       <span className="text-slate-300 flex items-center">
-                        <span className="text-lg mr-2">🎯</span>Escrow Milestones
+                        <span className="text-lg mr-2">🎯</span>Escrow
                       </span>
                       <span className="font-semibold text-purple-400">
-                        {totalEscrowAmount.toFixed(2)} {selectedToken.symbol}
+                        {escrowAmount.toFixed(2)} {selectedToken.symbol}
                       </span>
                     </div>
                   )}
@@ -575,6 +479,17 @@ export default function CreateStreamPage() {
                 </div>
               </div>
             )}
+
+            {/* Info Box */}
+            <div className="bg-slate-700/30 p-4 rounded-lg border border-slate-600">
+              <h3 className="font-semibold mb-2 text-slate-100">ℹ️ How it works:</h3>
+              <ul className="text-sm text-slate-300 space-y-1 list-disc list-inside">
+                <li><strong>Paystream:</strong> Tokens unlock continuously over time. Employee can withdraw as funds vest.</li>
+                <li><strong>Escrow:</strong> Tokens locked upfront for milestone-based payments. Requires auditor approval to release.</li>
+                <li><strong>Combined:</strong> Both amounts are locked in a single transaction when you create the payment.</li>
+                <li>You can enable both or just one payment method as needed.</li>
+              </ul>
+            </div>
 
             <Button
               type="submit"
