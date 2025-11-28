@@ -9,8 +9,8 @@ export default function Header() {
   const { isAuthenticated, logout } = useAuth(); // Removed walletAddress from destructuring
 
   const handleLogout = () => {
-    logout(); // This now handles both disconnect and store cleanup
-    router.push("/login");
+    disconnect();
+    router.push("/");
   };
 
   return (
