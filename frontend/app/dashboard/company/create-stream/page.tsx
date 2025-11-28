@@ -295,10 +295,10 @@ export default function CreateStreamPage() {
   if (!isConnected) {
     return (
       <div className="max-w-2xl">
-        <h1 className="text-3xl font-bold mb-8">Create Payment</h1>
+        <h1 className="text-3xl font-bold mb-8 text-slate-100">Create Payment</h1>
         <Card>
           <div className="p-8 text-center">
-            <p className="text-gray-600">Please connect your wallet to create a payment.</p>
+            <p className="text-slate-400">Please connect your wallet to create a payment.</p>
           </div>
         </Card>
       </div>
@@ -307,21 +307,21 @@ export default function CreateStreamPage() {
 
   return (
     <div className="max-w-6xl">
-      <h1 className="text-3xl font-bold mb-8">Create Payment</h1>
+      <h1 className="text-3xl font-bold mb-8 text-slate-100">Create Payment</h1>
 
       <Card>
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-600">{error}</p>
+            <div className="p-4 bg-red-900/20 border border-red-800/50 rounded-lg">
+              <p className="text-sm text-red-300">{error}</p>
             </div>
           )}
 
           {success && (
-            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-sm text-green-600">{success}</p>
+            <div className="p-4 bg-green-900/20 border border-green-800/50 rounded-lg">
+              <p className="text-sm text-green-300">{success}</p>
               {transactionHash && (
-                <p className="text-xs text-gray-600 mt-2 font-mono break-all">
+                <p className="text-xs text-slate-400 mt-2 font-mono break-all">
                   Last Tx: {transactionHash}
                 </p>
               )}
@@ -329,15 +329,15 @@ export default function CreateStreamPage() {
           )}
 
           {tokenWhitelistWarning && (
-            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <p className="text-sm text-yellow-800">{tokenWhitelistWarning}</p>
+            <div className="p-4 bg-yellow-900/20 border border-yellow-800/50 rounded-lg">
+              <p className="text-sm text-yellow-300">{tokenWhitelistWarning}</p>
             </div>
           )}
 
           <fieldset disabled={!isCorrectNetwork || isSubmitting}>
             {/* Employee Address */}
             <div>
-              <label className="block text-sm font-medium mb-2">
+              <label className="block text-sm font-medium mb-2 text-slate-200">
                 Employee Wallet Address
               </label>
               <input
@@ -348,20 +348,20 @@ export default function CreateStreamPage() {
                 placeholder="0x..."
                 className="input-base"
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-slate-400 mt-1">
                 Must be a valid Ethereum address
               </p>
             </div>
 
             {/* Payment Method - Two Tables Side by Side */}
             <div>
-              <label className="block text-sm font-medium mb-3">
+              <label className="block text-sm font-medium mb-3 text-slate-200">
                 Payment Method
               </label>
               <div className="grid grid-cols-2 gap-4">
                 {/* Paystream Table */}
-                <div className={`border-2 rounded-lg transition-all ${enablePaystream ? 'border-blue-400 bg-white' : 'border-gray-300 bg-gray-50'}`}>
-                  <div className="p-4 border-b">
+                <div className={`border-2 rounded-lg transition-all ${enablePaystream ? 'border-blue-400 bg-slate-800' : 'border-slate-600 bg-slate-900'}`}>
+                  <div className="p-4 border-b border-slate-700">
                     <label className="flex items-center cursor-pointer">
                       <input
                         type="checkbox"
@@ -370,14 +370,14 @@ export default function CreateStreamPage() {
                         className="w-5 h-5 mr-3"
                       />
                       <div>
-                        <span className="font-semibold text-lg block">💰 Paystream</span>
-                        <span className="text-xs text-gray-600">Continuous streaming payment</span>
+                        <span className="font-semibold text-lg block text-slate-100">💰 Paystream</span>
+                        <span className="text-xs text-slate-400">Continuous streaming payment</span>
                       </div>
                     </label>
                   </div>
                   <div className={`p-4 space-y-4 ${!enablePaystream ? 'opacity-40 pointer-events-none' : ''}`}>
                     <div>
-                      <label className="block text-sm font-medium mb-2">
+                      <label className="block text-sm font-medium mb-2 text-slate-200">
                         Amount ({selectedToken.symbol})
                       </label>
                       <input
@@ -390,12 +390,12 @@ export default function CreateStreamPage() {
                         disabled={!enablePaystream}
                         className="input-base"
                       />
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-slate-400 mt-1">
                         Amount to stream continuously
                       </p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-2">
+                      <label className="block text-sm font-medium mb-2 text-slate-200">
                         Duration (Days)
                       </label>
                       <input
@@ -408,13 +408,13 @@ export default function CreateStreamPage() {
                         disabled={!enablePaystream}
                         className="input-base"
                       />
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-slate-400 mt-1">
                         Stream duration: {paystreamDurationInSeconds.toLocaleString()} seconds
                       </p>
                     </div>
                     {enablePaystream && paystreamAmount > 0 && (
-                      <div className="bg-blue-50 p-3 rounded">
-                        <p className="text-sm text-gray-700">
+                      <div className="bg-blue-900/20 p-3 rounded border border-blue-800/50">
+                        <p className="text-sm text-slate-300">
                           Daily rate: <span className="font-semibold">{(paystreamAmount / formData.paystreamDuration).toFixed(6)} {selectedToken.symbol}/day</span>
                         </p>
                       </div>
@@ -423,8 +423,8 @@ export default function CreateStreamPage() {
                 </div>
 
                 {/* Escrow Table */}
-                <div className={`border-2 rounded-lg transition-all ${enableEscrow ? 'border-purple-400 bg-white' : 'border-gray-300 bg-gray-50'}`}>
-                  <div className="p-4 border-b">
+                <div className={`border-2 rounded-lg transition-all ${enableEscrow ? 'border-purple-400 bg-slate-800' : 'border-slate-600 bg-slate-900'}`}>
+                  <div className="p-4 border-b border-slate-700">
                     <label className="flex items-center cursor-pointer">
                       <input
                         type="checkbox"
@@ -433,26 +433,26 @@ export default function CreateStreamPage() {
                         className="w-5 h-5 mr-3"
                       />
                       <div>
-                        <span className="font-semibold text-lg block">🎯 Escrow</span>
-                        <span className="text-xs text-gray-600">Milestone-based payment</span>
+                        <span className="font-semibold text-lg block text-slate-100">🎯 Escrow</span>
+                        <span className="text-xs text-slate-400">Milestone-based payment</span>
                       </div>
                     </label>
                   </div>
                   <div className={`p-4 space-y-3 max-h-96 overflow-y-auto ${!enableEscrow ? 'opacity-40 pointer-events-none' : ''}`}>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-slate-400">
                       Configure milestones for escrow payment
                     </p>
 
                     {escrowItems.map((item, index) => (
-                      <div key={item.id} className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                      <div key={item.id} className="bg-slate-900 p-3 rounded-lg border border-slate-700">
                         <div className="flex justify-between items-center mb-2">
-                          <span className="font-medium text-xs">Milestone {index + 1}</span>
+                          <span className="font-medium text-xs text-slate-200">Milestone {index + 1}</span>
                           {escrowItems.length > 1 && (
                             <button
                               type="button"
                               onClick={() => removeEscrowItem(item.id)}
                               disabled={!enableEscrow}
-                              className="text-red-600 hover:text-red-800 text-xs font-medium"
+                              className="text-red-400 hover:text-red-300 text-xs font-medium"
                             >
                               ✕
                             </button>
@@ -461,7 +461,7 @@ export default function CreateStreamPage() {
 
                         <div className="space-y-2">
                           <div>
-                            <label className="block text-xs font-medium mb-1">Amount ({selectedToken.symbol})</label>
+                            <label className="block text-xs font-medium mb-1 text-slate-300">Amount ({selectedToken.symbol})</label>
                             <input
                               type="number"
                               value={item.amount}
@@ -473,7 +473,7 @@ export default function CreateStreamPage() {
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium mb-1">Deadline</label>
+                            <label className="block text-xs font-medium mb-1 text-slate-300">Deadline</label>
                             <input
                               type="date"
                               value={item.deadline}
@@ -483,7 +483,7 @@ export default function CreateStreamPage() {
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium mb-1">Description</label>
+                            <label className="block text-xs font-medium mb-1 text-slate-300">Description</label>
                             <textarea
                               value={item.description}
                               onChange={(e) => handleEscrowItemChange(item.id, "description", e.target.value)}
@@ -501,7 +501,7 @@ export default function CreateStreamPage() {
                       type="button"
                       onClick={addEscrowItem}
                       disabled={!enableEscrow}
-                      className="w-full px-3 py-2 border border-purple-300 text-purple-600 font-medium rounded-lg hover:bg-purple-100 transition text-sm"
+                      className="w-full px-3 py-2 border border-purple-600 text-purple-400 font-medium rounded-lg hover:bg-purple-900/30 transition text-sm"
                     >
                       + Add Milestone
                     </button>
@@ -512,22 +512,22 @@ export default function CreateStreamPage() {
 
             {/* Currency Selection */}
             <div>
-              <label className="block text-sm font-medium mb-2">Currency (ERC20)</label>
+              <label className="block text-sm font-medium mb-2 text-slate-200">Currency (ERC20)</label>
               {showTokenSelector ? (
                 <TokenSelector
                   value={selectedToken.address}
                   onChange={handleTokenChange}
                 />
               ) : (
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg border border-slate-700">
                   <div className="flex items-center gap-2">
                     <span className="text-xl">{selectedToken.logo || "💰"}</span>
-                    <span className="font-semibold">{selectedToken.symbol} - {selectedToken.name}</span>
+                    <span className="font-semibold text-slate-100">{selectedToken.symbol} - {selectedToken.name}</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => setShowTokenSelector(true)}
-                    className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                    className="text-sm font-medium text-blue-400 hover:text-blue-300"
                   >
                     Change
                   </button>
@@ -537,10 +537,10 @@ export default function CreateStreamPage() {
 
             {/* Payment Summary */}
             {totalAmount > 0 && (
-              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <div className="bg-blue-900/20 p-4 rounded-lg border border-blue-800/50">
                 <div className="mb-3">
-                  <h3 className="font-semibold">Payment Summary</h3>
-                  <p className="text-xs text-gray-600 mt-1">
+                  <h3 className="font-semibold text-slate-100">Payment Summary</h3>
+                  <p className="text-xs text-slate-400 mt-1">
                     Breakdown of your payment
                   </p>
                 </div>
@@ -548,27 +548,27 @@ export default function CreateStreamPage() {
                 <div className="space-y-3 text-sm">
                   {enablePaystream && (
                     <div className="flex justify-between">
-                      <span className="text-gray-600 flex items-center">
+                      <span className="text-slate-300 flex items-center">
                         <span className="text-lg mr-2">💰</span>Paystream
                       </span>
-                      <span className="font-semibold">
+                      <span className="font-semibold text-slate-100">
                         {paystreamAmount.toFixed(2)} {selectedToken.symbol}
                       </span>
                     </div>
                   )}
                   {enableEscrow && (
                     <div className="flex justify-between">
-                      <span className="text-gray-600 flex items-center">
+                      <span className="text-slate-300 flex items-center">
                         <span className="text-lg mr-2">🎯</span>Escrow Milestones
                       </span>
-                      <span className="font-semibold text-purple-600">
+                      <span className="font-semibold text-purple-400">
                         {totalEscrowAmount.toFixed(2)} {selectedToken.symbol}
                       </span>
                     </div>
                   )}
-                  <div className="flex justify-between py-2 border-t border-blue-200">
-                    <span className="text-gray-700 font-bold">Total</span>
-                    <span className="font-bold text-lg text-blue-600">
+                  <div className="flex justify-between py-2 border-t border-blue-800/50">
+                    <span className="text-slate-200 font-bold">Total</span>
+                    <span className="font-bold text-lg text-blue-400">
                       {totalAmount.toFixed(6)} {selectedToken.symbol}
                     </span>
                   </div>
