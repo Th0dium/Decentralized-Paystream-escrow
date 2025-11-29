@@ -7,6 +7,7 @@ const PAYSTREAM_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS as Address
 
 export interface EnrichedPayment {
   paymentId: number
+  name: string
   company: string
   employee: string
   token: string // token address
@@ -141,6 +142,7 @@ export function useMyPayments(userAddress: Address | null): UseMyPaymentsReturn 
 
         return {
           paymentId: paymentId,
+          name: p.name,
           company: p.company,
           employee: p.employee,
           token: p.token,

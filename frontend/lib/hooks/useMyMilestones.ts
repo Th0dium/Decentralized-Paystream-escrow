@@ -15,6 +15,7 @@ export enum MilestoneStatus {
 export interface EnrichedMilestone {
   milestoneId: number
   paymentId: number
+  paymentName: string
   submitter: string
   amount: bigint
   status: MilestoneStatus
@@ -111,6 +112,7 @@ export function useMyMilestones(userAddress: Address | null, role: 'employee' | 
       // Extract unique paymentIds
       const uniquePaymentIds = Array.from(new Set(results.map((m: any) => m.paymentId)));
       const paymentTokenMap: { [paymentId: number]: Address } = {};
+      const paymentNameMap: { [paymentId: number]: string } = {};
       const tokenAddressSet = new Set<Address>();
 
       if (uniquePaymentIds.length > 0) {
@@ -126,6 +128,7 @@ export function useMyMilestones(userAddress: Address | null, role: 'employee' | 
         paymentResults.forEach((p: any, index) => {
             const currentPaymentId = Number(uniquePaymentIds[index]);
             paymentTokenMap[currentPaymentId] = p.token;
+            paymentNameMap[currentPaymentId] = p.name;
             tokenAddressSet.add(p.token);
         });
       }
@@ -144,10 +147,12 @@ export function useMyMilestones(userAddress: Address | null, role: 'employee' | 
       const milestones: EnrichedMilestone[] = results.map((m: any, index) => {
         const tokenAddress = paymentTokenMap[Number(m.paymentId)];
         const tokenInfo = allTokenDetails[tokenAddress];
+        const paymentName = paymentNameMap[Number(m.paymentId)];
 
         return {
           milestoneId: Number(milestoneIds[index]),
           paymentId: Number(m.paymentId),
+          paymentName: paymentName || `Payment #${m.paymentId}`,
           submitter: m.submitter,
           amount: m.amount,
           status: m.status,
