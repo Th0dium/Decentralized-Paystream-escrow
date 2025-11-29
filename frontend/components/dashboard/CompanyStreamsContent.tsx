@@ -7,12 +7,14 @@ import { useAuth } from "@/lib/hooks";
 import { useMyPayments } from "@/lib/hooks/useMyPayments";
 import { formatUnits } from "viem";
 import { pauseStream, resumeStream, cancelStream } from "@/lib/contract-interaction";
+import { useDashboardStore } from "@/lib/dashboard-store";
 
 const ITEMS_PER_PAGE = 10;
 
 export default function CompanyStreamsContent() {
   const { walletAddress, isCompany } = useAuth();
   const { asCompany: streams, isLoading: loading, error, refetch } = useMyPayments(walletAddress as any);
+  const { setActiveDashboardView } = useDashboardStore();
   const [currentPage, setCurrentPage] = useState(1);
   const [actionStreamId, setActionStreamId] = useState<number | null>(null);
   const [actionType, setActionType] = useState<
@@ -89,12 +91,20 @@ export default function CompanyStreamsContent() {
     <div>
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-slate-100">Manage Salary Streams</h1>
-        <Button
-          onClick={handleRefresh}
-          variant="secondary"
-        >
-          Refresh
-        </Button>
+        <div className="flex gap-3">
+          <Button
+            onClick={() => setActiveDashboardView('company-create-payment')}
+            variant="primary"
+          >
+            Create New Stream
+          </Button>
+          <Button
+            onClick={handleRefresh}
+            variant="secondary"
+          >
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {!isCompany && (
@@ -119,113 +129,119 @@ export default function CompanyStreamsContent() {
         </Card>
       ) : (
         <>
-          <div className="space-y-4 mb-8">
-            {paginatedStreams.map((stream) => (
-              <Card key={stream.paymentId}>
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-xl font-semibold text-slate-100">
-                      Stream #{stream.paymentId}
-                    </h3>
-                    <p className="text-sm text-slate-400">
-                      Employee: {stream.employee.slice(0, 6)}...
-                      {stream.employee.slice(-4)}
-                    </p>
-                  </div>
-                  <span
-                    className={`px-3 py-1 rounded-full text-sm font-medium ${stream.cancelled
-                        ? "bg-red-900/30 text-red-300"
-                        : stream.paused
-                          ? "bg-yellow-900/30 text-yellow-300"
-                          : "bg-green-900/30 text-green-300"
-                      }`}
-                  >
-                    {stream.cancelled
-                      ? "Cancelled"
-                      : stream.paused
-                        ? "Paused"
-                        : "Active"}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                  <div>
-                    <div className="text-sm text-slate-400">Stream Amount</div>
-                    <div className="text-lg font-semibold text-slate-100">
-                      {formatUnits(stream.streamAmount, stream.tokenDecimals)} {stream.tokenSymbol}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-slate-400">Escrow Amount</div>
-                    <div className="text-lg font-semibold text-purple-400">
-                      {formatUnits(stream.escrowAmount, stream.tokenDecimals)} {stream.tokenSymbol}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-slate-400">Withdrawn</div>
-                    <div className="text-lg font-semibold text-slate-100">
-                      {formatUnits(stream.withdrawn, stream.tokenDecimals)} {stream.tokenSymbol}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-slate-400">Progress</div>
-                    <div className="text-lg font-semibold text-blue-400">{stream.progress}%</div>
-                  </div>
-                </div>
-
-                <div className="text-sm text-slate-400 mb-6">
-                  <p>Start: {new Date(Number(stream.startTime) * 1000).toLocaleDateString()}</p>
-                  <p>End: {new Date(Number(stream.stopTime) * 1000).toLocaleDateString()}</p>
-                </div>
-
-                {!stream.cancelled && (
-                  <div className="flex gap-3 flex-wrap">
-                    {!stream.paused ? (
-                      <Button
-                        onClick={() =>
-                          handleStreamAction(stream.paymentId, "pause")
-                        }
-                        variant="secondary"
-                        loading={
-                          actionStreamId === stream.paymentId &&
-                          actionType === "pause" &&
-                          isSubmitting
-                        }
-                      >
-                        Pause Stream
-                      </Button>
-                    ) : (
-                      <Button
-                        onClick={() =>
-                          handleStreamAction(stream.paymentId, "resume")
-                        }
-                        variant="success"
-                        loading={
-                          actionStreamId === stream.paymentId &&
-                          actionType === "resume" &&
-                          isSubmitting
-                        }
-                      >
-                        Resume Stream
-                      </Button>
-                    )}
-                    <Button
-                      onClick={() =>
-                        handleStreamAction(stream.paymentId, "cancel")
-                      }
-                      variant="danger"
-                      loading={
-                        actionStreamId === stream.paymentId &&
-                        actionType === "cancel" &&
-                        isSubmitting
-                      }
-                    >
-                      Cancel Stream
-                    </Button>
-                  </div>
-                )}
-              </Card>
-            ))}
+          <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+            <div className="overflow-x-auto">
+              <div className="max-h-[600px] overflow-y-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead className="bg-slate-900 sticky top-0 z-10">
+                    <tr>
+                      <th className="p-4 text-slate-400 font-medium border-b border-slate-700">ID</th>
+                      <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Employee</th>
+                      <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Status</th>
+                      <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Amount</th>
+                      <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Escrow</th>
+                      <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Withdrawn</th>
+                      <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Progress</th>
+                      <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Time</th>
+                      <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700">
+                    {paginatedStreams.map((stream) => (
+                      <tr key={stream.paymentId} className="hover:bg-slate-700/50 transition-colors">
+                        <td className="p-4 text-slate-100 font-mono">#{stream.paymentId}</td>
+                        <td className="p-4 text-slate-300 font-mono" title={stream.employee}>
+                          {stream.employee.slice(0, 6)}...{stream.employee.slice(-4)}
+                        </td>
+                        <td className="p-4">
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${stream.cancelled
+                                ? "bg-red-900/30 text-red-300"
+                                : stream.paused
+                                  ? "bg-yellow-900/30 text-yellow-300"
+                                  : "bg-green-900/30 text-green-300"
+                              }`}
+                          >
+                            {stream.cancelled
+                              ? "Cancelled"
+                              : stream.paused
+                                ? "Paused"
+                                : "Active"}
+                          </span>
+                        </td>
+                        <td className="p-4 text-slate-100">
+                          {formatUnits(stream.streamAmount, stream.tokenDecimals)} {stream.tokenSymbol}
+                        </td>
+                        <td className="p-4 text-purple-400">
+                          {formatUnits(stream.escrowAmount, stream.tokenDecimals)} {stream.tokenSymbol}
+                        </td>
+                        <td className="p-4 text-slate-300">
+                          {formatUnits(stream.withdrawn, stream.tokenDecimals)}
+                        </td>
+                        <td className="p-4">
+                          <div className="w-full bg-slate-700 rounded-full h-2.5 mb-1 min-w-[60px]">
+                            <div
+                              className="bg-blue-600 h-2.5 rounded-full"
+                              style={{ width: `${stream.progress}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-xs text-slate-400">{stream.progress}%</span>
+                        </td>
+                        <td className="p-4 text-xs text-slate-400">
+                          <div>Start: {new Date(Number(stream.startTime) * 1000).toLocaleDateString()}</div>
+                          <div>End: {new Date(Number(stream.stopTime) * 1000).toLocaleDateString()}</div>
+                        </td>
+                        <td className="p-4">
+                          {!stream.cancelled && (
+                            <div className="flex flex-col gap-2">
+                              {!stream.paused ? (
+                                <Button
+                                  onClick={() => handleStreamAction(stream.paymentId, "pause")}
+                                  variant="secondary"
+                                  className="text-xs py-1 px-2 h-auto"
+                                  loading={
+                                    actionStreamId === stream.paymentId &&
+                                    actionType === "pause" &&
+                                    isSubmitting
+                                  }
+                                >
+                                  Pause
+                                </Button>
+                              ) : (
+                                <Button
+                                  onClick={() => handleStreamAction(stream.paymentId, "resume")}
+                                  variant="success"
+                                  className="text-xs py-1 px-2 h-auto"
+                                  loading={
+                                    actionStreamId === stream.paymentId &&
+                                    actionType === "resume" &&
+                                    isSubmitting
+                                  }
+                                >
+                                  Resume
+                                </Button>
+                              )}
+                              <Button
+                                onClick={() => handleStreamAction(stream.paymentId, "cancel")}
+                                variant="danger"
+                                className="text-xs py-1 px-2 h-auto"
+                                loading={
+                                  actionStreamId === stream.paymentId &&
+                                  actionType === "cancel" &&
+                                  isSubmitting
+                                }
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
 
           {/* Pagination */}

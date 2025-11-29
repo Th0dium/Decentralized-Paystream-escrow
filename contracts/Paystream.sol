@@ -379,8 +379,12 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
         s.cancelled = true;
 
-        // Refund unvested stream amount and all remaining escrow
-        uint256 refundStream = s.streamAmount - s.withdrawn;
+        // Calculate the total amount earned by the employee from the continuous stream
+        uint256 totalAccrued = getTotalEarned(streamId);
+
+        // Refund the unearned stream amount
+        // If streamAmount is less than totalAccrued (e.g., due to rounding or edge cases), refund 0 for stream.
+        uint256 refundStream = s.streamAmount > totalAccrued ? s.streamAmount - totalAccrued : 0;
         uint256 refundEscrow = s.escrowed;
 
         if (refundStream > 0) {

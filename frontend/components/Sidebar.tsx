@@ -3,9 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/hooks";
-import { useDashboardStore } from "@/lib/dashboard-store"; // Import the new store
-
-type DashboardView = 'overview' | 'employee' | 'company' | 'auditor';
+import { useDashboardStore, DashboardView } from "@/lib/dashboard-store"; // Import DashboardView type
 
 interface MenuSection {
   title?: string;
@@ -16,7 +14,7 @@ interface MenuItem {
   href: string;
   label: string;
   show: boolean;
-  view: DashboardView; // New prop to store associated view
+  view: DashboardView; // Now using the imported DashboardView type
 }
 
 export default function Sidebar() {
@@ -45,9 +43,9 @@ export default function Sidebar() {
     {
       items: [
         { href: "/dashboard", label: "Overview", show: true, view: "overview" },
-        { href: "/dashboard", label: "Employee", show: true, view: "employee" },
-        { href: "/dashboard", label: "Company", show: true, view: "company" },
-        { href: "/dashboard", label: "Auditor", show: true, view: "auditor" },
+        { href: "/dashboard", label: "Employee", show: true, view: "employee-streams" }, // Direct to streams
+        { href: "/dashboard", label: "Company", show: true, view: "company-streams" }, // Direct to streams list
+        { href: "/dashboard", label: "Auditor", show: true, view: "auditor-milestones" }, // Direct to milestones
       ],
     },
   ];

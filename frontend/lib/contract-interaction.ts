@@ -1,4 +1,4 @@
-import { parseUnits, Address, decodeEventLog } from "viem";
+import { parseUnits, Address, decodeEventLog, parseAbiItem } from "viem";
 import {
   writeContract,
   readContract,
@@ -336,7 +336,53 @@ export async function getEmployeeStreams(
   }));
 }
 
-import { parseAbiItem } from "viem";
+/**
+ * Fetch all streams where the user is the company.
+ * Strategy:
+ * 1. Filter 'StreamCreated' events where 'company' == userAddress.
+ * 2. Extract streamIds.
+ * 3. Fetch current stream details for each ID.
+ */
+export async function getCompanyStreams(
+  contractAddress: Address,
+  companyAddress: Address,
+  publicClient: any
+) {
+  console.log(`🔍 Fetching streams for company: ${companyAddress}`);
+
+  // 1. Get Logs (Indexed Query)
+  const logs = await publicClient.getLogs({
+    address: contractAddress,
+    event: parseAbiItem('event StreamCreated(uint256 indexed streamId, address indexed company, address indexed employee, address token, uint256 streamAmount, uint256 escrowAmount, uint64 startTime, uint64 stopTime)'),
+    args: {
+      company: companyAddress,
+    },
+    fromBlock: 'earliest',
+  });
+
+  console.log(`Found ${logs.length} company stream creation events.`);
+
+  // 2. Extract Stream IDs
+  const streamIds = logs.map((log: any) => log.args.streamId);
+
+  // 3. Fetch Details (in parallel)
+  const streamDetailsPromises = streamIds.map((id: bigint) =>
+    publicClient.readContract({
+      address: contractAddress,
+      abi: PAYSTREAM_ABI,
+      functionName: 'getStream',
+      args: [id],
+    })
+  );
+
+  const streams = await Promise.all(streamDetailsPromises);
+
+  // Combine ID with data
+  return streams.map((stream: any, index: number) => ({
+    streamId: streamIds[index].toString(),
+    ...stream,
+  }));
+}
 
 /**
  * Approve tokens for the Paystream contract

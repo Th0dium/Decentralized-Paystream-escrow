@@ -4,244 +4,182 @@ import { useState } from "react";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { useAuth } from "@/lib/hooks";
-import { useMyPayments } from "@/lib/hooks/useMyPayments";
 import { useMyMilestones, MilestoneStatus } from "@/lib/hooks/useMyMilestones";
 import { formatUnits } from "viem";
 import { approveMilestone, rejectMilestone } from "@/lib/contract-interaction";
 
-const ITEMS_PER_PAGE = 10;
-
 export default function AuditorMilestonesContent() {
-  const { walletAddress, isAuditor } = useAuth();
-  const { asAuditor: auditorStreams, isLoading: streamsLoading, refetch: refetchStreams } = useMyPayments(walletAddress as any);
-  const { milestones, isLoading: milestonesLoading, refetch: refetchMilestones } = useMyMilestones(walletAddress as any, 'auditor');
-  
-  const [reviewingId, setReviewingId] = useState<number | null>(null);
-  const [reviewAction, setReviewAction] = useState<"approve" | "reject" | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  const { walletAddress } = useAuth();
+  const { milestones, isLoading, error, refetch } = useMyMilestones(walletAddress as any, "auditor");
+  const [activeTab, setActiveTab] = useState<"pending" | "history">("pending");
+  const [actionId, setActionId] = useState<number | null>(null);
+  const [actionType, setActionType] = useState<"approve" | "reject" | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleReviewMilestone = async (
-    milestoneId: number,
-    action: "approve" | "reject"
-  ) => {
-    setReviewingId(milestoneId);
-    setReviewAction(action);
+  // Filter milestones based on tab
+  const filteredMilestones = milestones.filter((m) => {
+    if (activeTab === "pending") return m.status === MilestoneStatus.PENDING;
+    return m.status !== MilestoneStatus.PENDING;
+  });
+
+  const handleAction = async (id: number, type: "approve" | "reject") => {
+    setActionId(id);
+    setActionType(type);
+    setIsSubmitting(true);
 
     try {
       const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
       if (!contractAddress) throw new Error("Contract address not configured");
 
-      const milestoneIdStr = milestoneId.toString();
-
-      if (action === "approve") {
-        await approveMilestone(contractAddress as any, milestoneIdStr);
+      if (type === "approve") {
+        await approveMilestone(contractAddress as any, id.toString());
       } else {
-        await rejectMilestone(contractAddress as any, milestoneIdStr);
+        await rejectMilestone(contractAddress as any, id.toString());
       }
-
-      // Refetch or reload
-      await Promise.all([refetchStreams(), refetchMilestones()]);
-    } catch (error) {
-      console.error(`Failed to ${action} milestone:`, error);
-      alert(`Failed to ${action}: ` + (error instanceof Error ? error.message : "Unknown error"));
+      await refetch();
+    } catch (err) {
+      console.error("Action failed:", err);
+      alert("Action failed. Check console for details.");
     } finally {
-      setReviewingId(null);
-      setReviewAction(null);
+      setIsSubmitting(false);
+      setActionId(null);
+      setActionType(null);
     }
   };
 
-  // Filter Pending Milestones
-  const pendingMilestones = milestones.filter(m => m.status === MilestoneStatus.PENDING);
-
-  // Pagination for Streams
-  const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIdx = startIdx + ITEMS_PER_PAGE;
-  const paginatedStreams = auditorStreams.slice(startIdx, endIdx);
-  const totalPages = Math.ceil(auditorStreams.length / ITEMS_PER_PAGE);
-
-  if (streamsLoading || milestonesLoading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-lg text-slate-400">Loading auditor dashboard...</div>
+        <div className="text-lg text-slate-400">Loading milestones...</div>
       </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <div className="text-red-400">Error: {error}</div>
+      </Card>
     );
   }
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-8 text-slate-100">Auditor Dashboard</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-slate-100">Milestone Reviews</h1>
+        <Button onClick={() => refetch()} variant="secondary">
+          Refresh
+        </Button>
+      </div>
 
-      {!isAuditor && (
-        <div className="mb-6 p-4 bg-blue-900/20 border border-blue-800/50 rounded-lg">
-          <p className="text-sm text-blue-300">
-            💡 You don&apos;t have an auditor role. Data shown below is for viewing only.
+      {/* Tabs */}
+      <div className="flex space-x-4 mb-6 border-b border-slate-700 pb-1">
+        <button
+          className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+            activeTab === "pending"
+              ? "bg-slate-800 text-blue-400 border-b-2 border-blue-500"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+          }`}
+          onClick={() => setActiveTab("pending")}
+        >
+          Pending Reviews ({milestones.filter(m => m.status === MilestoneStatus.PENDING).length})
+        </button>
+        <button
+          className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+            activeTab === "history"
+              ? "bg-slate-800 text-blue-400 border-b-2 border-blue-500"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+          }`}
+          onClick={() => setActiveTab("history")}
+        >
+          History
+        </button>
+      </div>
+
+      {/* Content */}
+      {filteredMilestones.length === 0 ? (
+        <Card>
+          <p className="text-center text-slate-400 py-8">
+            {activeTab === "pending"
+              ? "No pending milestones to review."
+              : "No milestone history found."}
           </p>
+        </Card>
+      ) : (
+        <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+          <div className="overflow-x-auto">
+            <div className="max-h-[600px] overflow-y-auto">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-slate-900 sticky top-0 z-10">
+                  <tr>
+                    <th className="p-4 text-slate-400 font-medium border-b border-slate-700">ID</th>
+                    <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Stream ID</th>
+                    <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Amount</th>
+                    <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Status</th>
+                    <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Date</th>
+                    {activeTab === "pending" && (
+                      <th className="p-4 text-slate-400 font-medium border-b border-slate-700 text-right">Actions</th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700">
+                  {filteredMilestones.map((milestone) => (
+                    <tr key={milestone.milestoneId} className="hover:bg-slate-700/50 transition-colors">
+                      <td className="p-4 text-slate-100 font-mono">#{milestone.milestoneId}</td>
+                      <td className="p-4 text-slate-300 font-mono">Stream #{milestone.streamId}</td>
+                      <td className="p-4 text-slate-100 font-semibold">
+                        {formatUnits(milestone.amount, milestone.tokenDecimals)} {milestone.tokenSymbol}
+                      </td>
+                      <td className="p-4">
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            milestone.status === MilestoneStatus.PENDING
+                              ? "bg-yellow-900/30 text-yellow-300"
+                              : milestone.status === MilestoneStatus.APPROVED
+                              ? "bg-green-900/30 text-green-300"
+                              : milestone.status === MilestoneStatus.REJECTED
+                              ? "bg-red-900/30 text-red-300"
+                              : "bg-slate-700 text-slate-300"
+                          }`}
+                        >
+                          {MilestoneStatus[milestone.status]}
+                        </span>
+                      </td>
+                      <td className="p-4 text-slate-400 text-sm">
+                        {new Date(milestone.createdAt * 1000).toLocaleDateString()}
+                      </td>
+                      {activeTab === "pending" && (
+                        <td className="p-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              onClick={() => handleAction(milestone.milestoneId, "approve")}
+                              variant="success"
+                              className="text-xs py-1 px-3 h-auto"
+                              loading={actionId === milestone.milestoneId && actionType === "approve" && isSubmitting}
+                              disabled={isSubmitting}
+                            >
+                              Approve
+                            </Button>
+                            <Button
+                              onClick={() => handleAction(milestone.milestoneId, "reject")}
+                              variant="danger"
+                              className="text-xs py-1 px-3 h-auto"
+                              loading={actionId === milestone.milestoneId && actionType === "reject" && isSubmitting}
+                              disabled={isSubmitting}
+                            >
+                              Reject
+                            </Button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
-
-      {/* PENDING MILESTONES SECTION */}
-      <div className="mb-12">
-        <h2 className="text-2xl font-semibold mb-6 text-slate-100">
-          Pending Approvals ({pendingMilestones.length})
-        </h2>
-
-        {pendingMilestones.length === 0 ? (
-            <Card>
-                <p className="text-center text-slate-400 py-8">
-                    No pending milestones to review.
-                </p>
-            </Card>
-        ) : (
-            <div className="space-y-4">
-                {pendingMilestones.map((milestone) => (
-                    <Card key={milestone.milestoneId}>
-                        <div className="flex justify-between items-start mb-4">
-                            <div>
-                                <h3 className="text-xl font-semibold text-slate-100">
-                                    Milestone #{milestone.milestoneId}
-                                </h3>
-                                <p className="text-sm text-slate-400">
-                                    Stream #{milestone.streamId} • Submitter: {milestone.submitter.slice(0,6)}...{milestone.submitter.slice(-4)}
-                                </p>
-                            </div>
-                            <span className="px-3 py-1 rounded-full text-sm font-medium bg-yellow-900/30 text-yellow-300">
-                                Pending Review
-                            </span>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4 mb-6">
-                            <div>
-                                <div className="text-sm text-slate-400">Amount Requested</div>
-                                <div className="text-lg font-semibold text-slate-100">
-                                    {formatUnits(milestone.amount, milestone.tokenDecimals)} {milestone.tokenSymbol}
-                                </div>
-                            </div>
-                            <div>
-                                <div className="text-sm text-slate-400">Submitted Date</div>
-                                <div className="text-sm font-semibold text-slate-100">
-                                    {new Date(milestone.createdAt * 1000).toLocaleDateString()}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-4">
-                             <Button 
-                                className="flex-1 bg-green-600 hover:bg-green-700"
-                                disabled={reviewingId === milestone.milestoneId}
-                                onClick={() => handleReviewMilestone(milestone.milestoneId, "approve")}
-                             >
-                                {reviewingId === milestone.milestoneId && reviewAction === "approve" ? "Approving..." : "Approve"}
-                             </Button>
-                             <Button 
-                                className="flex-1 bg-red-600 hover:bg-red-700"
-                                disabled={reviewingId === milestone.milestoneId}
-                                onClick={() => handleReviewMilestone(milestone.milestoneId, "reject")}
-                             >
-                                {reviewingId === milestone.milestoneId && reviewAction === "reject" ? "Rejecting..." : "Reject"}
-                             </Button>
-                        </div>
-                    </Card>
-                ))}
-            </div>
-        )}
-      </div>
-
-      {/* STREAMS SUMMARY */}
-      <div className="mb-12">
-        <h2 className="text-2xl font-semibold mb-6 text-slate-100">
-          Assigned Streams ({auditorStreams.length})
-        </h2>
-
-        {auditorStreams.length === 0 ? (
-          <Card>
-            <p className="text-center text-slate-400 py-8">
-              No streams assigned to you as auditor yet.
-            </p>
-          </Card>
-        ) : (
-          <>
-            <div className="space-y-4 mb-8">
-              {paginatedStreams.map((stream) => (
-                <Card key={stream.paymentId}>
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="text-xl font-semibold text-slate-100">
-                        Stream #{stream.paymentId}
-                      </h3>
-                      <p className="text-sm text-slate-400">
-                        Employee: {stream.employee.slice(0, 6)}...{stream.employee.slice(-4)}
-                      </p>
-                    </div>
-                    <span
-                      className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        stream.cancelled
-                          ? "bg-red-900/30 text-red-300"
-                          : stream.paused
-                            ? "bg-yellow-900/30 text-yellow-300"
-                            : "bg-green-900/30 text-green-300"
-                      }`}
-                    >
-                      {stream.cancelled ? "Cancelled" : stream.paused ? "Paused" : "Active"}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                    <div>
-                      <div className="text-sm text-slate-400">Escrow Amount</div>
-                      <div className="text-lg font-semibold text-purple-400">
-                        {formatUnits(stream.escrowAmount, stream.tokenDecimals)} {stream.tokenSymbol}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-slate-400">Stream Amount</div>
-                      <div className="text-lg font-semibold text-slate-100">
-                        {formatUnits(stream.streamAmount, stream.tokenDecimals)} {stream.tokenSymbol}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-slate-400">Progress</div>
-                      <div className="text-lg font-semibold text-blue-400">{stream.progress}%</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-slate-400">Status</div>
-                      <div className="text-lg font-semibold text-slate-100">
-                        {stream.isActive ? "Active" : "Inactive"}
-                      </div>
-                    </div>
-                  </div>
-
-                  <p className="text-sm text-slate-400">
-                    End Date: {new Date(Number(stream.stopTime) * 1000).toLocaleDateString()}
-                  </p>
-                </Card>
-              ))}
-            </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex justify-center gap-2 mt-8">
-                <button
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Previous
-                </button>
-                <span className="px-4 py-2 text-slate-300">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <button
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </>
-        )}
-      </div>
     </div>
   );
 }
