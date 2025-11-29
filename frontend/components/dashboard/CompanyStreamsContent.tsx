@@ -4,10 +4,11 @@ import { useState } from "react";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { useAuth } from "@/lib/hooks";
-import { useMyPayments } from "@/lib/hooks/useMyPayments";
+import { useMyPayments, EnrichedPayment } from "@/lib/hooks/useMyPayments";
 import { formatUnits } from "viem";
 import { pausePayment, resumePayment, cancelPayment } from "@/lib/contract-interaction";
 import { useDashboardStore } from "@/lib/dashboard-store";
+import PaymentDetailsModal from "@/components/PaymentDetailsModal";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -16,10 +17,9 @@ export default function CompanyStreamsContent() {
   const { asCompany: payments, isLoading: loading, error, refetch } = useMyPayments(walletAddress as any);
   const { setActiveDashboardView } = useDashboardStore();
   const [currentPage, setCurrentPage] = useState(1);
-  const [actionPaymentId, setActionPaymentId] = useState<number | null>(null);
-  const [actionType, setActionType] = useState<
-    "pause" | "resume" | "cancel" | null
-  >(null);
+  
+  // Modal State
+  const [selectedPayment, setSelectedPayment] = useState<EnrichedPayment | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -35,10 +35,10 @@ export default function CompanyStreamsContent() {
 
   const handlePaymentAction = async (
     paymentId: number,
-    type: "pause" | "resume" | "cancel"
+    type: "pause" | "resume" | "cancel" | "withdraw"
   ) => {
-    setActionPaymentId(paymentId);
-    setActionType(type);
+    if (type === "withdraw") return; // Company cannot withdraw
+    
     setActionError(null);
     setIsSubmitting(true);
 
@@ -60,14 +60,13 @@ export default function CompanyStreamsContent() {
           break;
       }
 
-      // Refetch after action
+      // Refetch after action and close modal
       await refetch();
+      setSelectedPayment(null);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Action failed");
     } finally {
       setIsSubmitting(false);
-      setActionPaymentId(null);
-      setActionType(null);
     }
   };
 
@@ -135,23 +134,22 @@ export default function CompanyStreamsContent() {
                 <table className="w-full text-left border-collapse">
                   <thead className="bg-slate-900 sticky top-0 z-10">
                     <tr>
-                      <th className="p-4 text-slate-400 font-medium border-b border-slate-700">ID</th>
-                      <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Employee</th>
+                      <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Payment</th>
                       <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Status</th>
-                      <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Stream Amount</th>
-                      <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Escrow</th>
-                      <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Withdrawn</th>
+                      <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Amounts (Stream / Escrow)</th>
                       <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Progress</th>
-                      <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Time</th>
-                      <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700">
                     {paginatedPayments.map((payment) => (
-                      <tr key={payment.paymentId} className="hover:bg-slate-700/50 transition-colors">
-                        <td className="p-4 text-slate-100 font-mono">#{payment.paymentId}</td>
-                        <td className="p-4 text-slate-300 font-mono" title={payment.employee}>
-                          {payment.employee.slice(0, 6)}...{payment.employee.slice(-4)}
+                      <tr 
+                        key={payment.paymentId} 
+                        className="hover:bg-slate-700/50 transition-colors cursor-pointer"
+                        onClick={() => setSelectedPayment(payment)}
+                      >
+                        <td className="p-4 text-slate-100">
+                          <div className="font-semibold">{payment.name}</div>
+                          <div className="text-xs text-slate-500">#{payment.paymentId}</div>
                         </td>
                         <td className="p-4">
                           <span
@@ -170,71 +168,19 @@ export default function CompanyStreamsContent() {
                           </span>
                         </td>
                         <td className="p-4 text-slate-100">
-                          {formatUnits(payment.streamAmount, payment.tokenDecimals)} {payment.tokenSymbol}
-                        </td>
-                        <td className="p-4 text-purple-400">
-                          {formatUnits(payment.escrowAmount, payment.tokenDecimals)} {payment.tokenSymbol}
-                        </td>
-                        <td className="p-4 text-slate-300">
-                          {formatUnits(payment.withdrawn, payment.tokenDecimals)}
+                          <div className="flex flex-col gap-1">
+                            <span className="text-sm">{formatUnits(payment.streamAmount, payment.tokenDecimals)} {payment.tokenSymbol} (Stream)</span>
+                            <span className="text-xs text-purple-400">{formatUnits(payment.escrowAmount, payment.tokenDecimals)} {payment.tokenSymbol} (Escrow)</span>
+                          </div>
                         </td>
                         <td className="p-4">
-                          <div className="w-full bg-slate-700 rounded-full h-2.5 mb-1 min-w-[60px]">
+                          <div className="w-full bg-slate-700 rounded-full h-2.5 mb-1 min-w-[100px] max-w-[200px]">
                             <div
                               className="bg-blue-600 h-2.5 rounded-full"
                               style={{ width: `${payment.progress}%` }}
                             ></div>
                           </div>
                           <span className="text-xs text-slate-400">{payment.progress}%</span>
-                        </td>
-                        <td className="p-4 text-xs text-slate-400">
-                          <div>Start: {new Date(Number(payment.startTime) * 1000).toLocaleDateString()}</div>
-                          <div>End: {new Date(Number(payment.stopTime) * 1000).toLocaleDateString()}</div>
-                        </td>
-                        <td className="p-4">
-                          {!payment.cancelled && (
-                            <div className="flex flex-col gap-2">
-                              {!payment.paused ? (
-                                <Button
-                                  onClick={() => handlePaymentAction(payment.paymentId, "pause")}
-                                  variant="secondary"
-                                  className="text-xs py-1 px-2 h-auto"
-                                  loading={
-                                    actionPaymentId === payment.paymentId &&
-                                    actionType === "pause" &&
-                                    isSubmitting
-                                  }
-                                >
-                                  Pause
-                                </Button>
-                              ) : (
-                                <Button
-                                  onClick={() => handlePaymentAction(payment.paymentId, "resume")}
-                                  variant="success"
-                                  className="text-xs py-1 px-2 h-auto"
-                                  loading={
-                                    actionPaymentId === payment.paymentId &&
-                                    actionType === "resume" &&
-                                    isSubmitting
-                                  }
-                                >
-                                  Resume
-                                </Button>
-                              )}
-                              <Button
-                                onClick={() => handlePaymentAction(payment.paymentId, "cancel")}
-                                variant="danger"
-                                className="text-xs py-1 px-2 h-auto"
-                                loading={
-                                  actionPaymentId === payment.paymentId &&
-                                  actionType === "cancel" &&
-                                  isSubmitting
-                                }
-                              >
-                                Cancel
-                              </Button>
-                            </div>
-                          )}
                         </td>
                       </tr>
                     ))}
@@ -268,6 +214,15 @@ export default function CompanyStreamsContent() {
           )}
         </>
       )}
+      
+      {/* Payment Details Modal */}
+      <PaymentDetailsModal
+        isOpen={!!selectedPayment}
+        closeModal={() => setSelectedPayment(null)}
+        payment={selectedPayment}
+        onAction={handlePaymentAction}
+        isSubmitting={isSubmitting}
+      />
     </div>
   );
 }

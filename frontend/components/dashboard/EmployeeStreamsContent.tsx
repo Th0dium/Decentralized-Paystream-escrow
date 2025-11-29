@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { Card } from "@/components/Card";
 import { useAuth } from "@/lib/hooks";
-import { useMyPayments } from "@/lib/hooks/useMyPayments";
+import { useMyPayments, EnrichedPayment } from "@/lib/hooks/useMyPayments";
 import { formatUnits } from "viem";
-import { withdrawStream } from "@/lib/contract-interaction";
-import { Button } from "@/components/Button"; // Import Button
+import { withdrawStream } from "@/lib/contract-interaction"; // Import withdrawStream directly if not handled by generic handler or adjust handler
+import { Button } from "@/components/Button"; 
+import PaymentDetailsModal from "@/components/PaymentDetailsModal";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -14,7 +15,10 @@ export default function EmployeeStreamsContent() {
   const { walletAddress, isEmployee } = useAuth();
   const { asEmployee: streams, isLoading: loading, error, refetch } = useMyPayments(walletAddress as any);
   const [currentPage, setCurrentPage] = useState(1);
-  const [withdrawing, setWithdrawing] = useState<number | null>(null);
+  
+  // Modal State
+  const [selectedPayment, setSelectedPayment] = useState<EnrichedPayment | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Client-side pagination
   const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -22,20 +26,23 @@ export default function EmployeeStreamsContent() {
   const paginatedStreams = streams.slice(startIdx, endIdx);
   const totalPages = Math.ceil(streams.length / ITEMS_PER_PAGE);
 
-  const handleWithdraw = async (paymentId: number) => {
+  const handleAction = async (paymentId: number, type: "pause" | "resume" | "cancel" | "withdraw") => {
+    if (type !== "withdraw") return;
+    
     try {
-      setWithdrawing(paymentId);
+      setIsSubmitting(true);
       const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
       if (!contractAddress) throw new Error("Contract address not configured");
 
       await withdrawStream(contractAddress as any, paymentId.toString());
-      // Refetch after withdraw
+      // Refetch after withdraw and close modal
       await refetch();
+      setSelectedPayment(null);
     } catch (err) {
       console.error("Withdraw error:", err);
       alert("Withdraw failed: " + (err instanceof Error ? err.message : "Unknown error"));
     } finally {
-      setWithdrawing(null);
+      setIsSubmitting(false);
     }
   };
 
@@ -89,84 +96,48 @@ export default function EmployeeStreamsContent() {
         <>
           <div className="space-y-4 mb-8">
             {paginatedStreams.map((stream) => (
-              <Card key={stream.paymentId}>
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-xl font-semibold text-slate-100">
-                      Stream #{stream.paymentId}
-                    </h3>
-                    <p className="text-sm text-slate-400">
-                      Company: {stream.company.slice(0, 6)}...
-                      {stream.company.slice(-4)}
-                    </p>
-                  </div>
-                  <span
-                    className={`px-3 py-1 rounded-full text-sm font-medium ${
-                      stream.cancelled
-                        ? "bg-red-900/30 text-red-300"
-                        : stream.paused
-                          ? "bg-yellow-900/30 text-yellow-300"
-                          : "bg-green-900/30 text-green-300"
-                    }`}
-                  >
-                    {stream.cancelled ? "Cancelled" : stream.paused ? "Paused" : "Active"}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                  <div>
-                    <div className="text-sm text-slate-400">Stream Amount</div>
-                    <div className="text-lg font-semibold text-slate-100">
-                      {formatUnits(stream.streamAmount, stream.tokenDecimals)} {stream.tokenSymbol}
+              <div 
+                key={stream.paymentId} 
+                onClick={() => setSelectedPayment(stream)}
+                className="cursor-pointer"
+              >
+                <Card className="hover:bg-slate-800/50 transition-colors border-l-4 border-l-blue-500">
+                    <div className="flex justify-between items-center mb-2">
+                        <div>
+                            <h3 className="text-lg font-semibold text-slate-100">{stream.name}</h3>
+                            <span className="text-xs text-slate-500">#{stream.paymentId}</span>
+                        </div>
+                        <span
+                            className={`px-3 py-1 rounded-full text-xs font-medium ${
+                            stream.cancelled
+                                ? "bg-red-900/30 text-red-300"
+                                : stream.paused
+                                ? "bg-yellow-900/30 text-yellow-300"
+                                : "bg-green-900/30 text-green-300"
+                            }`}
+                        >
+                            {stream.cancelled ? "Cancelled" : stream.paused ? "Paused" : "Active"}
+                        </span>
                     </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-slate-400">Claimable</div>
-                    <div className="text-lg font-semibold text-green-400">
-                      {stream.claimableAmount ? formatUnits(stream.claimableAmount, stream.tokenDecimals) : "0"} {stream.tokenSymbol}
+
+                    <div className="flex justify-between text-sm mb-2">
+                        <div className="text-slate-400">
+                            Total: <span className="text-slate-200">{formatUnits(stream.streamAmount + stream.escrowAmount, stream.tokenDecimals)} {stream.tokenSymbol}</span>
+                        </div>
+                         <div className="text-slate-400">
+                            Progress: <span className="text-blue-400">{stream.progress}%</span>
+                        </div>
                     </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-slate-400">Withdrawn</div>
-                    <div className="text-lg font-semibold text-slate-100">
-                      {formatUnits(stream.withdrawn, stream.tokenDecimals)} {stream.tokenSymbol}
+
+                    {/* Progress Bar */}
+                    <div className="w-full bg-slate-700 rounded-full h-1.5">
+                        <div
+                            className="bg-blue-500 h-1.5 rounded-full"
+                            style={{ width: `${stream.progress}%` }}
+                        />
                     </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-slate-400">Progress</div>
-                    <div className="text-lg font-semibold text-blue-400">{stream.progress}%</div>
-                  </div>
-                </div>
-
-                {/* Progress Bar */}
-                <div className="w-full bg-slate-700 rounded h-2 mb-4">
-                  <div
-                    className="bg-green-500 h-2 rounded transition-all"
-                    style={{ width: `${stream.progress}%` }}
-                  />
-                </div>
-
-                <div className="text-sm text-slate-400 mb-4">
-                  <p>Start: {new Date(Number(stream.startTime) * 1000).toLocaleDateString()}</p>
-                  <p>End: {new Date(Number(stream.stopTime) * 1000).toLocaleDateString()}</p>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex gap-2">
-                  <button
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 px-4 py-2 rounded text-sm transition"
-                    onClick={() => handleWithdraw(stream.paymentId)}
-                    disabled={!stream.claimableAmount || stream.claimableAmount === 0n || withdrawing === stream.paymentId}
-                  >
-                    {withdrawing === stream.paymentId ? "Withdrawing..." : "Withdraw"}
-                  </button>
-                  {stream.escrowAmount > 0n && (
-                    <button className="flex-1 bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-sm transition">
-                      View Milestones
-                    </button>
-                  )}
-                </div>
-              </Card>
+                </Card>
+              </div>
             ))}
           </div>
 
@@ -194,6 +165,14 @@ export default function EmployeeStreamsContent() {
           )}
         </>
       )}
+
+      <PaymentDetailsModal
+        isOpen={!!selectedPayment}
+        closeModal={() => setSelectedPayment(null)}
+        payment={selectedPayment}
+        onAction={handleAction}
+        isSubmitting={isSubmitting}
+      />
     </div>
   );
 }
