@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Address } from 'viem'
+import { Address, parseAbiItem } from 'viem'
 import { usePublicClient } from 'wagmi'
 import { PAYSTREAM_ABI, getTokenSymbol, getTokenDecimals } from '@/lib/contract-interaction' // Import new functions
 
@@ -54,11 +54,25 @@ export function useMyPayments(userAddress: Address | null): UseMyPaymentsReturn 
 
   // Helper: Query stream IDs for a role
   const queryStreamIds = useCallback(async (
-    functionName: 'getEmployeeStreams' | 'getCompanyStreams' | 'getAuditorStreams',
+    role: 'employee' | 'company' | 'auditor',
     userAddress: Address
   ): Promise<number[]> => {
     if (!publicClient) return [];
     try {
+      let functionName: 'getEmployeeStreams' | 'getCompanyStreams' | 'getAuditorStreams';
+      
+      switch (role) {
+        case 'employee':
+          functionName = 'getEmployeeStreams';
+          break;
+        case 'company':
+          functionName = 'getCompanyStreams';
+          break;
+        case 'auditor':
+          functionName = 'getAuditorStreams';
+          break;
+      }
+
       const ids = await publicClient.readContract({
         address: PAYSTREAM_ADDRESS,
         abi: PAYSTREAM_ABI,
@@ -67,7 +81,7 @@ export function useMyPayments(userAddress: Address | null): UseMyPaymentsReturn 
       })
       return (ids as bigint[]).map(id => Number(id))
     } catch (error) {
-      console.error(`Error querying ${functionName}:`, error)
+      console.error(`Error querying streams for ${role}:`, error)
       return []
     }
   }, [publicClient]);
@@ -167,9 +181,9 @@ export function useMyPayments(userAddress: Address | null): UseMyPaymentsReturn 
 
       // Query all 3 role arrays in parallel
       const [employeeIds, companyIds, auditorIds] = await Promise.all([
-        queryStreamIds('getEmployeeStreams', userAddress),
-        queryStreamIds('getCompanyStreams', userAddress),
-        queryStreamIds('getAuditorStreams', userAddress),
+        queryStreamIds('employee', userAddress),
+        queryStreamIds('company', userAddress),
+        queryStreamIds('auditor', userAddress),
       ])
 
       // Fetch full stream details for each ID
