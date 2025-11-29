@@ -31,6 +31,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
     // ============ Structs ============
     struct Payment {
+        string name;
         address company;
         address employee;
         IERC20 token;
@@ -92,6 +93,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
     event PaymentCreated(
         uint256 indexed paymentId,
+        string name,
         address indexed company,
         address indexed employee,
         address token,
@@ -198,6 +200,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
     // ============ Payment Creation ============
     /**
      * @notice Create a new payment. The caller must have approved tokens.
+     * @param name Name/Title of the payment
      * @param employee Address receiving the payment
      * @param token ERC20 token address
      * @param streamAmount Amount to stream continuously over duration
@@ -207,6 +210,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
      * @return paymentId The created payment ID
      */
     function createPayment(
+        string memory name,
         address employee,
         address token,
         uint256 streamAmount,
@@ -219,6 +223,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
         require(employee != address(0), "invalid employee");
         require(employee != msg.sender, "company cannot be employee");
         require(token != address(0), "invalid token");
+        require(bytes(name).length > 0, "name required");
         require(
             streamAmount >= MIN_PAYMENT_AMOUNT || escrowAmount >= MIN_PAYMENT_AMOUNT,
             "amount too small"
@@ -238,6 +243,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
         // --- Payment Creation ---
         uint256 paymentId = _nextPaymentId++;
         payments[paymentId] = Payment({
+            name: name,
             company: msg.sender,
             employee: employee,
             token: erc20,
@@ -259,6 +265,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
         emit PaymentCreated(
             paymentId,
+            name,
             msg.sender,
             employee,
             token,

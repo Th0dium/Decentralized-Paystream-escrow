@@ -14,6 +14,7 @@ export default function CompanyCreatePaymentContent() {
   const { setActiveDashboardView } = useDashboardStore();
 
   // Form State
+  const [paymentName, setPaymentName] = useState("");
   const [recipientAddress, setRecipientAddress] = useState("");
   const [selectedToken, setSelectedToken] = useState<Token>(WHITELISTED_TOKENS[0]);
   
@@ -80,6 +81,7 @@ export default function CompanyCreatePaymentContent() {
     setError(null);
     setIsLoading(true);
     try {
+      if (!paymentName) throw new Error("Payment name is required");
       if (!isAddress(recipientAddress)) throw new Error("Invalid recipient address");
       
       const total = calculateTotal();
@@ -105,6 +107,7 @@ export default function CompanyCreatePaymentContent() {
 
       await createPayment(
         contractAddress as any,
+        paymentName,
         recipientAddress as any,
         selectedToken.address as any,
         sAmount,
@@ -132,7 +135,22 @@ export default function CompanyCreatePaymentContent() {
       </div>
 
       <Card>
-        {/* Top Section: Recipient & Token */}
+        {/* Top Section: Payment Name, Recipient & Token */}
+        <div className="grid grid-cols-1 gap-6 mb-8">
+          <div>
+            <label className="block text-sm font-medium text-slate-400 mb-2">
+              Payment Name / Title
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. Monthly Salary - John Doe"
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              value={paymentName}
+              onChange={(e) => setPaymentName(e.target.value)}
+            />
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <div>
             <label className="block text-sm font-medium text-slate-400 mb-2">
