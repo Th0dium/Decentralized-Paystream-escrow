@@ -10,7 +10,7 @@ import { pauseStream, resumeStream, cancelStream } from "@/lib/contract-interact
 
 const ITEMS_PER_PAGE = 10;
 
-export default function CompanyStreamsPage() {
+export default function CompanyStreamsContent() {
   const { walletAddress, isCompany } = useAuth();
   const { asCompany: streams, isLoading: loading, error, refetch } = useMyPayments(walletAddress as any);
   const [currentPage, setCurrentPage] = useState(1);

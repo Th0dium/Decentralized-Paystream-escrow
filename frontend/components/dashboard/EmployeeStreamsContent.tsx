@@ -1,16 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import { Card } from "@/components/Card";
 import { useAuth } from "@/lib/hooks";
 import { useMyPayments } from "@/lib/hooks/useMyPayments";
 import { formatUnits } from "viem";
-import { useState } from "react";
 import { withdrawStream } from "@/lib/contract-interaction";
 import { Button } from "@/components/Button"; // Import Button
 
 const ITEMS_PER_PAGE = 10;
 
-export default function EmployeeStreamsPage() {
+export default function EmployeeStreamsContent() {
   const { walletAddress, isEmployee } = useAuth();
   const { asEmployee: streams, isLoading: loading, error, refetch } = useMyPayments(walletAddress as any);
   const [currentPage, setCurrentPage] = useState(1);
