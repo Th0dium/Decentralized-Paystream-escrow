@@ -6,17 +6,17 @@ import { Button } from "@/components/Button";
 import { useAuth } from "@/lib/hooks";
 import { useMyPayments } from "@/lib/hooks/useMyPayments";
 import { formatUnits } from "viem";
-import { pauseStream, resumeStream, cancelStream } from "@/lib/contract-interaction";
+import { pausePayment, resumePayment, cancelPayment } from "@/lib/contract-interaction";
 import { useDashboardStore } from "@/lib/dashboard-store";
 
 const ITEMS_PER_PAGE = 10;
 
 export default function CompanyStreamsContent() {
   const { walletAddress, isCompany } = useAuth();
-  const { asCompany: streams, isLoading: loading, error, refetch } = useMyPayments(walletAddress as any);
+  const { asCompany: payments, isLoading: loading, error, refetch } = useMyPayments(walletAddress as any);
   const { setActiveDashboardView } = useDashboardStore();
   const [currentPage, setCurrentPage] = useState(1);
-  const [actionStreamId, setActionStreamId] = useState<number | null>(null);
+  const [actionPaymentId, setActionPaymentId] = useState<number | null>(null);
   const [actionType, setActionType] = useState<
     "pause" | "resume" | "cancel" | null
   >(null);
@@ -26,18 +26,18 @@ export default function CompanyStreamsContent() {
   // Client-side pagination
   const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIdx = startIdx + ITEMS_PER_PAGE;
-  const paginatedStreams = streams.slice(startIdx, endIdx);
-  const totalPages = Math.ceil(streams.length / ITEMS_PER_PAGE);
+  const paginatedPayments = payments.slice(startIdx, endIdx);
+  const totalPages = Math.ceil(payments.length / ITEMS_PER_PAGE);
 
   const handleRefresh = async () => {
     await refetch();
   };
 
-  const handleStreamAction = async (
-    streamId: number,
+  const handlePaymentAction = async (
+    paymentId: number,
     type: "pause" | "resume" | "cancel"
   ) => {
-    setActionStreamId(streamId);
+    setActionPaymentId(paymentId);
     setActionType(type);
     setActionError(null);
     setIsSubmitting(true);
@@ -46,17 +46,17 @@ export default function CompanyStreamsContent() {
       const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
       if (!contractAddress) throw new Error("Contract address not configured");
 
-      const streamIdStr = streamId.toString();
+      const paymentIdStr = paymentId.toString();
 
       switch (type) {
         case "pause":
-          await pauseStream(contractAddress as any, streamIdStr);
+          await pausePayment(contractAddress as any, paymentIdStr);
           break;
         case "resume":
-          await resumeStream(contractAddress as any, streamIdStr);
+          await resumePayment(contractAddress as any, paymentIdStr);
           break;
         case "cancel":
-          await cancelStream(contractAddress as any, streamIdStr);
+          await cancelPayment(contractAddress as any, paymentIdStr);
           break;
       }
 
@@ -66,7 +66,7 @@ export default function CompanyStreamsContent() {
       setActionError(err instanceof Error ? err.message : "Action failed");
     } finally {
       setIsSubmitting(false);
-      setActionStreamId(null);
+      setActionPaymentId(null);
       setActionType(null);
     }
   };
@@ -74,7 +74,7 @@ export default function CompanyStreamsContent() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-lg text-slate-400">Loading streams...</div>
+        <div className="text-lg text-slate-400">Loading payments...</div>
       </div>
     );
   }
@@ -90,13 +90,13 @@ export default function CompanyStreamsContent() {
   return (
     <div>
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-slate-100">Manage Salary Streams</h1>
+        <h1 className="text-3xl font-bold text-slate-100">Manage Salary Payments</h1>
         <div className="flex gap-3">
           <Button
             onClick={() => setActiveDashboardView('company-create-payment')}
             variant="primary"
           >
-            Create New Stream
+            Create New Payment
           </Button>
           <Button
             onClick={handleRefresh}
@@ -121,10 +121,10 @@ export default function CompanyStreamsContent() {
         </div>
       )}
 
-      {streams.length === 0 ? (
+      {payments.length === 0 ? (
         <Card>
           <p className="text-center text-slate-400 py-8">
-            You have not created any streams yet.
+            You have not created any payments yet.
           </p>
         </Card>
       ) : (
@@ -138,7 +138,7 @@ export default function CompanyStreamsContent() {
                       <th className="p-4 text-slate-400 font-medium border-b border-slate-700">ID</th>
                       <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Employee</th>
                       <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Status</th>
-                      <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Amount</th>
+                      <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Stream Amount</th>
                       <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Escrow</th>
                       <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Withdrawn</th>
                       <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Progress</th>
@@ -147,60 +147,60 @@ export default function CompanyStreamsContent() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700">
-                    {paginatedStreams.map((stream) => (
-                      <tr key={stream.paymentId} className="hover:bg-slate-700/50 transition-colors">
-                        <td className="p-4 text-slate-100 font-mono">#{stream.paymentId}</td>
-                        <td className="p-4 text-slate-300 font-mono" title={stream.employee}>
-                          {stream.employee.slice(0, 6)}...{stream.employee.slice(-4)}
+                    {paginatedPayments.map((payment) => (
+                      <tr key={payment.paymentId} className="hover:bg-slate-700/50 transition-colors">
+                        <td className="p-4 text-slate-100 font-mono">#{payment.paymentId}</td>
+                        <td className="p-4 text-slate-300 font-mono" title={payment.employee}>
+                          {payment.employee.slice(0, 6)}...{payment.employee.slice(-4)}
                         </td>
                         <td className="p-4">
                           <span
-                            className={`px-2 py-1 rounded-full text-xs font-medium ${stream.cancelled
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${payment.cancelled
                                 ? "bg-red-900/30 text-red-300"
-                                : stream.paused
+                                : payment.paused
                                   ? "bg-yellow-900/30 text-yellow-300"
                                   : "bg-green-900/30 text-green-300"
                               }`}
                           >
-                            {stream.cancelled
+                            {payment.cancelled
                               ? "Cancelled"
-                              : stream.paused
+                              : payment.paused
                                 ? "Paused"
                                 : "Active"}
                           </span>
                         </td>
                         <td className="p-4 text-slate-100">
-                          {formatUnits(stream.streamAmount, stream.tokenDecimals)} {stream.tokenSymbol}
+                          {formatUnits(payment.streamAmount, payment.tokenDecimals)} {payment.tokenSymbol}
                         </td>
                         <td className="p-4 text-purple-400">
-                          {formatUnits(stream.escrowAmount, stream.tokenDecimals)} {stream.tokenSymbol}
+                          {formatUnits(payment.escrowAmount, payment.tokenDecimals)} {payment.tokenSymbol}
                         </td>
                         <td className="p-4 text-slate-300">
-                          {formatUnits(stream.withdrawn, stream.tokenDecimals)}
+                          {formatUnits(payment.withdrawn, payment.tokenDecimals)}
                         </td>
                         <td className="p-4">
                           <div className="w-full bg-slate-700 rounded-full h-2.5 mb-1 min-w-[60px]">
                             <div
                               className="bg-blue-600 h-2.5 rounded-full"
-                              style={{ width: `${stream.progress}%` }}
+                              style={{ width: `${payment.progress}%` }}
                             ></div>
                           </div>
-                          <span className="text-xs text-slate-400">{stream.progress}%</span>
+                          <span className="text-xs text-slate-400">{payment.progress}%</span>
                         </td>
                         <td className="p-4 text-xs text-slate-400">
-                          <div>Start: {new Date(Number(stream.startTime) * 1000).toLocaleDateString()}</div>
-                          <div>End: {new Date(Number(stream.stopTime) * 1000).toLocaleDateString()}</div>
+                          <div>Start: {new Date(Number(payment.startTime) * 1000).toLocaleDateString()}</div>
+                          <div>End: {new Date(Number(payment.stopTime) * 1000).toLocaleDateString()}</div>
                         </td>
                         <td className="p-4">
-                          {!stream.cancelled && (
+                          {!payment.cancelled && (
                             <div className="flex flex-col gap-2">
-                              {!stream.paused ? (
+                              {!payment.paused ? (
                                 <Button
-                                  onClick={() => handleStreamAction(stream.paymentId, "pause")}
+                                  onClick={() => handlePaymentAction(payment.paymentId, "pause")}
                                   variant="secondary"
                                   className="text-xs py-1 px-2 h-auto"
                                   loading={
-                                    actionStreamId === stream.paymentId &&
+                                    actionPaymentId === payment.paymentId &&
                                     actionType === "pause" &&
                                     isSubmitting
                                   }
@@ -209,11 +209,11 @@ export default function CompanyStreamsContent() {
                                 </Button>
                               ) : (
                                 <Button
-                                  onClick={() => handleStreamAction(stream.paymentId, "resume")}
+                                  onClick={() => handlePaymentAction(payment.paymentId, "resume")}
                                   variant="success"
                                   className="text-xs py-1 px-2 h-auto"
                                   loading={
-                                    actionStreamId === stream.paymentId &&
+                                    actionPaymentId === payment.paymentId &&
                                     actionType === "resume" &&
                                     isSubmitting
                                   }
@@ -222,11 +222,11 @@ export default function CompanyStreamsContent() {
                                 </Button>
                               )}
                               <Button
-                                onClick={() => handleStreamAction(stream.paymentId, "cancel")}
+                                onClick={() => handlePaymentAction(payment.paymentId, "cancel")}
                                 variant="danger"
                                 className="text-xs py-1 px-2 h-auto"
                                 loading={
-                                  actionStreamId === stream.paymentId &&
+                                  actionPaymentId === payment.paymentId &&
                                   actionType === "cancel" &&
                                   isSubmitting
                                 }

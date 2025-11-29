@@ -113,7 +113,7 @@ export default function AuditorMilestonesContent() {
                 <thead className="bg-slate-900 sticky top-0 z-10">
                   <tr>
                     <th className="p-4 text-slate-400 font-medium border-b border-slate-700">ID</th>
-                    <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Stream ID</th>
+                    <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Payment ID</th>
                     <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Amount</th>
                     <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Status</th>
                     <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Date</th>
@@ -126,7 +126,7 @@ export default function AuditorMilestonesContent() {
                   {filteredMilestones.map((milestone) => (
                     <tr key={milestone.milestoneId} className="hover:bg-slate-700/50 transition-colors">
                       <td className="p-4 text-slate-100 font-mono">#{milestone.milestoneId}</td>
-                      <td className="p-4 text-slate-300 font-mono">Stream #{milestone.streamId}</td>
+                      <td className="p-4 text-slate-300 font-mono">Payment #{milestone.paymentId}</td>
                       <td className="p-4 text-slate-100 font-semibold">
                         {formatUnits(milestone.amount, milestone.tokenDecimals)} {milestone.tokenSymbol}
                       </td>
