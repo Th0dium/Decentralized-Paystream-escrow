@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Address } from 'viem'
 import { usePublicClient } from 'wagmi'
-import { PAYSTREAM_ABI, getTokenSymbol, getTokenDecimals } from '@/lib/contract-interaction' // Import new functions
+import { PAYSTREAM_ABI, getTokenSymbol, getTokenDecimals } from '@/lib/contract-interaction' 
 
 const PAYSTREAM_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS as Address
 
@@ -14,16 +14,14 @@ export enum MilestoneStatus {
 
 export interface EnrichedMilestone {
   milestoneId: number
-  streamId: number
+  paymentId: number
   submitter: string
   amount: bigint
   status: MilestoneStatus
   createdAt: number
   approvedAt: number
-  tokenSymbol: string // Added
-  tokenDecimals: number // Added
-  // Computed/Extra
-  ipfsHash?: string // Not on chain in current contract version, but kept for type compatibility
+  tokenSymbol: string 
+  tokenDecimals: number 
 }
 
 interface UseMyMilestonesReturn {
@@ -64,28 +62,28 @@ export function useMyMilestones(userAddress: Address | null, role: 'employee' | 
         milestoneIds = [...(result as bigint[])];
       } else if (role === 'auditor') {
          try {
-            // 1. Get all streams audited by this user
-            const streams = await publicClient.readContract({
+            // 1. Get all payments audited by this user
+            const payments = await publicClient.readContract({
                 address: PAYSTREAM_ADDRESS,
                 abi: PAYSTREAM_ABI,
-                functionName: 'getAuditorStreams',
+                functionName: 'getAuditorPayments',
                 args: [userAddress],
             }) as bigint[];
 
-            if (streams.length > 0) {
-                // 2. Get milestones for each stream
-                const milestonePromises = streams.map(sId => 
+            if (payments.length > 0) {
+                // 2. Get milestones for each payment
+                const milestonePromises = payments.map(pId => 
                     publicClient.readContract({
                         address: PAYSTREAM_ADDRESS,
                         abi: PAYSTREAM_ABI,
-                        functionName: 'getStreamMilestones',
-                        args: [sId]
+                        functionName: 'getPaymentMilestones',
+                        args: [pId]
                     })
                 );
                 
-                const streamMilestones = await Promise.all(milestonePromises);
+                const paymentMilestones = await Promise.all(milestonePromises);
                 // Flatten array of arrays
-                milestoneIds = (streamMilestones as bigint[][]).flat();
+                milestoneIds = (paymentMilestones as bigint[][]).flat();
             }
          } catch (err) {
              console.error("Error fetching auditor milestones:", err);
@@ -110,25 +108,25 @@ export function useMyMilestones(userAddress: Address | null, role: 'employee' | 
 
       const results = await Promise.all(detailsPromises);
 
-      // Extract unique token addresses from associated streams
-      const uniqueStreamIds = Array.from(new Set(results.map((m: any) => m.streamId)));
-      const streamTokenMap: { [streamId: number]: Address } = {};
+      // Extract unique paymentIds
+      const uniquePaymentIds = Array.from(new Set(results.map((m: any) => m.paymentId)));
+      const paymentTokenMap: { [paymentId: number]: Address } = {};
       const tokenAddressSet = new Set<Address>();
 
-      if (uniqueStreamIds.length > 0) {
-        const streamPromises = uniqueStreamIds.map(streamId =>
+      if (uniquePaymentIds.length > 0) {
+        const paymentPromises = uniquePaymentIds.map(paymentId =>
             publicClient.readContract({
                 address: PAYSTREAM_ADDRESS,
                 abi: PAYSTREAM_ABI,
-                functionName: 'getStream',
-                args: [BigInt(streamId)],
+                functionName: 'getPayment',
+                args: [BigInt(paymentId)],
             })
         );
-        const streamResults = await Promise.all(streamPromises);
-        streamResults.forEach((s: any, index) => {
-            const currentStreamId = Number(uniqueStreamIds[index]);
-            streamTokenMap[currentStreamId] = s.token;
-            tokenAddressSet.add(s.token);
+        const paymentResults = await Promise.all(paymentPromises);
+        paymentResults.forEach((p: any, index) => {
+            const currentPaymentId = Number(uniquePaymentIds[index]);
+            paymentTokenMap[currentPaymentId] = p.token;
+            tokenAddressSet.add(p.token);
         });
       }
 
@@ -144,12 +142,12 @@ export function useMyMilestones(userAddress: Address | null, role: 'employee' | 
       const allTokenDetails = Object.assign({}, ...(await Promise.all(tokenDetailsPromises)));
 
       const milestones: EnrichedMilestone[] = results.map((m: any, index) => {
-        const tokenAddress = streamTokenMap[Number(m.streamId)];
+        const tokenAddress = paymentTokenMap[Number(m.paymentId)];
         const tokenInfo = allTokenDetails[tokenAddress];
 
         return {
           milestoneId: Number(milestoneIds[index]),
-          streamId: Number(m.streamId),
+          paymentId: Number(m.paymentId),
           submitter: m.submitter,
           amount: m.amount,
           status: m.status,
