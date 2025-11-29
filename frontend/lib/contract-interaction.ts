@@ -13,7 +13,7 @@ export const PAYSTREAM_ABI = [
   {
     anonymous: false,
     inputs: [
-      { indexed: true, internalType: "uint256", name: "streamId", type: "uint256" },
+      { indexed: true, internalType: "uint256", name: "paymentId", type: "uint256" },
       { indexed: true, internalType: "address", name: "company", type: "address" },
       { indexed: true, internalType: "address", name: "employee", type: "address" },
       { indexed: false, internalType: "address", name: "token", type: "address" },
@@ -22,7 +22,7 @@ export const PAYSTREAM_ABI = [
       { indexed: false, internalType: "uint64", name: "startTime", type: "uint64" },
       { indexed: false, internalType: "uint64", name: "stopTime", type: "uint64" },
     ],
-    name: "StreamCreated",
+    name: "PaymentCreated",
     type: "event",
   },
   // --- View Functions ---
@@ -34,14 +34,14 @@ export const PAYSTREAM_ABI = [
     type: "function",
   },
   {
-    inputs: [{ internalType: "uint256", name: "streamId", type: "uint256" }],
-    name: "getStream",
+    inputs: [{ internalType: "uint256", name: "paymentId", type: "uint256" }],
+    name: "getPayment",
     outputs: [
       {
         components: [
           { internalType: "address", name: "company", type: "address" },
           { internalType: "address", name: "employee", type: "address" },
-          { internalType: "address", name: "token", type: "address" }, // Note: changed from contract IERC20 to address for compatibility
+          { internalType: "address", name: "token", type: "address" }, 
           { internalType: "uint256", name: "streamAmount", type: "uint256" },
           { internalType: "uint256", name: "escrowAmount", type: "uint256" },
           { internalType: "uint64", name: "startTime", type: "uint64" },
@@ -54,7 +54,7 @@ export const PAYSTREAM_ABI = [
           { internalType: "uint64", name: "totalPausedDuration", type: "uint64" },
           { internalType: "uint64", name: "pausedAt", type: "uint64" },
         ],
-        internalType: "struct Paystream.Stream",
+        internalType: "struct Paystream.Payment",
         name: "",
         type: "tuple",
       },
@@ -64,7 +64,7 @@ export const PAYSTREAM_ABI = [
   },
   {
     inputs: [{ internalType: "uint256", name: "", type: "uint256" }],
-    name: "streams",
+    name: "payments",
     outputs: [
       { internalType: "address", name: "company", type: "address" },
       { internalType: "address", name: "employee", type: "address" },
@@ -86,21 +86,21 @@ export const PAYSTREAM_ABI = [
   },
   {
     inputs: [{ internalType: "address", name: "employee", type: "address" }],
-    name: "getEmployeeStreams",
+    name: "getEmployeePayments",
     outputs: [{ internalType: "uint256[]", name: "", type: "uint256[]" }],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [{ internalType: "address", name: "company", type: "address" }],
-    name: "getCompanyStreams",
+    name: "getCompanyPayments",
     outputs: [{ internalType: "uint256[]", name: "", type: "uint256[]" }],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [{ internalType: "address", name: "", type: "address" }],
-    name: "getAuditorStreams",
+    name: "getAuditorPayments",
     outputs: [{ internalType: "uint256[]", name: "", type: "uint256[]" }],
     stateMutability: "view",
     type: "function",
@@ -113,8 +113,8 @@ export const PAYSTREAM_ABI = [
     type: "function",
   },
   {
-    inputs: [{ internalType: "uint256", name: "streamId", type: "uint256" }],
-    name: "getStreamMilestones",
+    inputs: [{ internalType: "uint256", name: "paymentId", type: "uint256" }],
+    name: "getPaymentMilestones",
     outputs: [{ internalType: "uint256[]", name: "", type: "uint256[]" }],
     stateMutability: "view",
     type: "function",
@@ -125,7 +125,7 @@ export const PAYSTREAM_ABI = [
     outputs: [
       {
         components: [
-          { internalType: "uint256", name: "streamId", type: "uint256" },
+          { internalType: "uint256", name: "paymentId", type: "uint256" },
           { internalType: "address", name: "submitter", type: "address" },
           { internalType: "uint256", name: "amount", type: "uint256" },
           { internalType: "enum Paystream.MilestoneStatus", name: "status", type: "uint8" },
@@ -150,42 +150,42 @@ export const PAYSTREAM_ABI = [
       { internalType: "uint64", name: "startTime", type: "uint64" },
       { internalType: "uint64", name: "stopTime", type: "uint64" },
     ],
-    name: "createStream",
+    name: "createPayment",
     outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
     stateMutability: "nonpayable",
     type: "function",
   },
   {
-    inputs: [{ internalType: "uint256", name: "streamId", type: "uint256" }],
+    inputs: [{ internalType: "uint256", name: "paymentId", type: "uint256" }],
     name: "withdraw",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
   {
-    inputs: [{ internalType: "uint256", name: "streamId", type: "uint256" }],
-    name: "pauseStream",
+    inputs: [{ internalType: "uint256", name: "paymentId", type: "uint256" }],
+    name: "pausePayment",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
   {
-    inputs: [{ internalType: "uint256", name: "streamId", type: "uint256" }],
-    name: "resumeStream",
+    inputs: [{ internalType: "uint256", name: "paymentId", type: "uint256" }],
+    name: "resumePayment",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
   {
-    inputs: [{ internalType: "uint256", name: "streamId", type: "uint256" }],
-    name: "cancelStream",
+    inputs: [{ internalType: "uint256", name: "paymentId", type: "uint256" }],
+    name: "cancelPayment",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
   {
     inputs: [
-      { internalType: "uint256", name: "streamId", type: "uint256" },
+      { internalType: "uint256", name: "paymentId", type: "uint256" },
       { internalType: "uint256", name: "amount", type: "uint256" },
     ],
     name: "submitMilestone",
@@ -287,100 +287,100 @@ export async function getTokenName(
 }
 
 /**
- * Fetch all streams where the user is the employee.
+ * Fetch all payments where the user is the employee.
  * Strategy:
- * 1. Filter 'StreamCreated' events where 'employee' == userAddress.
- * 2. Extract streamIds.
- * 3. Fetch current stream details for each ID.
+ * 1. Filter 'PaymentCreated' events where 'employee' == userAddress.
+ * 2. Extract paymentIds.
+ * 3. Fetch current payment details for each ID.
  */
-export async function getEmployeeStreams(
+export async function getEmployeePayments(
   contractAddress: Address,
   employeeAddress: Address,
   publicClient: any // Pass the public client from wagmi/viem
 ) {
-  console.log(`🔍 Fetching streams for employee: ${employeeAddress}`);
+  console.log(`🔍 Fetching payments for employee: ${employeeAddress}`);
 
   // 1. Get Logs (Indexed Query)
-  // We look for StreamCreated events where the 3rd indexed argument (employee) matches
+  // We look for PaymentCreated events where the 3rd indexed argument (employee) matches
   const logs = await publicClient.getLogs({
     address: contractAddress,
-    event: parseAbiItem('event StreamCreated(uint256 indexed streamId, address indexed company, address indexed employee, address token, uint256 streamAmount, uint256 escrowAmount, uint64 startTime, uint64 stopTime)'),
+    event: parseAbiItem('event PaymentCreated(uint256 indexed paymentId, address indexed company, address indexed employee, address token, uint256 streamAmount, uint256 escrowAmount, uint64 startTime, uint64 stopTime)'),
     args: {
       employee: employeeAddress,
     },
     fromBlock: 'earliest', // Or a specific deployment block to save RPC calls
   });
 
-  console.log(`Found ${logs.length} stream creation events.`);
+  console.log(`Found ${logs.length} payment creation events.`);
 
-  // 2. Extract Stream IDs
-  const streamIds = logs.map((log: any) => log.args.streamId);
+  // 2. Extract Payment IDs
+  const paymentIds = logs.map((log: any) => log.args.paymentId);
 
   // 3. Fetch Details (in parallel)
   // Note: In a production app, you might want to use multicall here
-  const streamDetailsPromises = streamIds.map((id: bigint) =>
+  const paymentDetailsPromises = paymentIds.map((id: bigint) =>
     publicClient.readContract({
       address: contractAddress,
       abi: PAYSTREAM_ABI,
-      functionName: 'getStream',
+      functionName: 'getPayment',
       args: [id],
     })
   );
 
-  const streams = await Promise.all(streamDetailsPromises);
+  const payments = await Promise.all(paymentDetailsPromises);
 
   // Combine ID with data
-  return streams.map((stream: any, index: number) => ({
-    streamId: streamIds[index].toString(),
-    ...stream,
+  return payments.map((payment: any, index: number) => ({
+    paymentId: paymentIds[index].toString(),
+    ...payment,
   }));
 }
 
 /**
- * Fetch all streams where the user is the company.
+ * Fetch all payments where the user is the company.
  * Strategy:
- * 1. Filter 'StreamCreated' events where 'company' == userAddress.
- * 2. Extract streamIds.
- * 3. Fetch current stream details for each ID.
+ * 1. Filter 'PaymentCreated' events where 'company' == userAddress.
+ * 2. Extract paymentIds.
+ * 3. Fetch current payment details for each ID.
  */
-export async function getCompanyStreams(
+export async function getCompanyPayments(
   contractAddress: Address,
   companyAddress: Address,
   publicClient: any
 ) {
-  console.log(`🔍 Fetching streams for company: ${companyAddress}`);
+  console.log(`🔍 Fetching payments for company: ${companyAddress}`);
 
   // 1. Get Logs (Indexed Query)
   const logs = await publicClient.getLogs({
     address: contractAddress,
-    event: parseAbiItem('event StreamCreated(uint256 indexed streamId, address indexed company, address indexed employee, address token, uint256 streamAmount, uint256 escrowAmount, uint64 startTime, uint64 stopTime)'),
+    event: parseAbiItem('event PaymentCreated(uint256 indexed paymentId, address indexed company, address indexed employee, address token, uint256 streamAmount, uint256 escrowAmount, uint64 startTime, uint64 stopTime)'),
     args: {
       company: companyAddress,
     },
     fromBlock: 'earliest',
   });
 
-  console.log(`Found ${logs.length} company stream creation events.`);
+  console.log(`Found ${logs.length} company payment creation events.`);
 
-  // 2. Extract Stream IDs
-  const streamIds = logs.map((log: any) => log.args.streamId);
+  // 2. Extract Payment IDs
+  const paymentIds = logs.map((log: any) => log.args.paymentId);
 
   // 3. Fetch Details (in parallel)
-  const streamDetailsPromises = streamIds.map((id: bigint) =>
+  const paymentDetailsPromises = paymentIds.map((id: bigint) =>
     publicClient.readContract({
       address: contractAddress,
       abi: PAYSTREAM_ABI,
-      functionName: 'getStream',
+      functionName: 'getPayment',
       args: [id],
     })
   );
 
-  const streams = await Promise.all(streamDetailsPromises);
+  const payments = await Promise.all(paymentDetailsPromises);
 
   // Combine ID with data
-  return streams.map((stream: any, index: number) => ({
-    streamId: streamIds[index].toString(),
-    ...stream,
+  return payments.map((payment: any, index: number) => ({
+    paymentId: paymentIds[index].toString(),
+    ...payment,
   }));
 }
 
@@ -416,9 +416,9 @@ export async function approveTokens(
 }
 
 /**
- * Create a payment stream on the Paystream contract with separate stream and escrow amounts
+ * Create a payment on the Paystream contract with separate stream and escrow amounts
  */
-export async function createStream(
+export async function createPayment(
   contractAddress: Address,
   employeeAddress: Address,
   tokenAddress: Address,
@@ -426,7 +426,7 @@ export async function createStream(
   escrowAmount: string,
   durationDays: number,
   tokenDecimals: number = 18
-): Promise<{ transactionHash: string; streamId?: string }> {
+): Promise<{ transactionHash: string; paymentId?: string }> {
 
   // Get current block timestamp
   const block = await getBlock(config);
@@ -437,7 +437,7 @@ export async function createStream(
   const streamAmountInWei = parseUnits(streamAmount, tokenDecimals);
   const escrowAmountInWei = parseUnits(escrowAmount, tokenDecimals);
 
-  console.log("\n💰 === CREATE STREAM (viem) ===");
+  console.log("\n💰 === CREATE PAYMENT (viem) ===");
   console.log(`📍 Contract: ${contractAddress}`);
   console.log(`👤 Employee: ${employeeAddress}`);
   console.log(`💰 Stream Amount: ${streamAmount} tokens (${streamAmountInWei} wei)`);
@@ -446,11 +446,11 @@ export async function createStream(
   console.log(`⏰ Start: ${startTime}, Stop: ${stopTime}`);
 
   try {
-    console.log("\n📤 Submitting createStream transaction...");
+    console.log("\n📤 Submitting createPayment transaction...");
     const hash = await writeContract(config, {
         address: contractAddress,
         abi: PAYSTREAM_ABI,
-        functionName: "createStream",
+        functionName: "createPayment",
         args: [
             employeeAddress,
             tokenAddress,
@@ -464,19 +464,19 @@ export async function createStream(
     console.log(`✅ Transaction sent: ${hash}`);
     const receipt = await waitForTransactionReceipt(config, { hash });
 
-    // Parse logs to find StreamCreated event and extract streamId
-    let streamId: string | undefined;
+    // Parse logs to find PaymentCreated event and extract paymentId
+    let paymentId: string | undefined;
     for (const log of receipt.logs) {
       try {
         const decodedLog = decodeEventLog({
           abi: PAYSTREAM_ABI,
-          eventName: 'StreamCreated',
+          eventName: 'PaymentCreated',
           data: log.data,
           topics: log.topics,
         });
-        if (decodedLog.eventName === 'StreamCreated') {
-          streamId = decodedLog.args.streamId.toString();
-          console.log(`✅ Found StreamCreated event. ID: ${streamId}`);
+        if (decodedLog.eventName === 'PaymentCreated') {
+          paymentId = decodedLog.args.paymentId.toString();
+          console.log(`✅ Found PaymentCreated event. ID: ${paymentId}`);
           break;
         }
       } catch {
@@ -486,13 +486,13 @@ export async function createStream(
 
     return {
       transactionHash: hash,
-      streamId
+      paymentId
     };
   } catch (error) {
-    console.error("\n❌ === CREATE STREAM FAILED ===");
+    console.error("\n❌ === CREATE PAYMENT FAILED ===");
     if (error instanceof Error) {
       console.error("Error:", error.message);
-      throw new Error(`Failed to create stream: ${error.message}`);
+      throw new Error(`Failed to create payment: ${error.message}`);
     }
     throw error;
   }
@@ -549,24 +549,24 @@ export async function checkTokenWhitelisted(
     }
 }
 
-// ============ STREAM MANAGEMENT FUNCTIONS ============
+// ============ PAYMENT MANAGEMENT FUNCTIONS ============
 
 /**
- * Withdraw vested funds from a payment stream
+ * Withdraw vested funds from a payment
  */
-export async function withdrawStream(
+export async function withdrawPayment(
   contractAddress: Address,
-  streamId: string
+  paymentId: string
 ): Promise<{ transactionHash: string }> {
-  console.log("\n💰 === WITHDRAW STREAM ===");
-  console.log(`📍 Stream ID: ${streamId}`);
+  console.log("\n💰 === WITHDRAW PAYMENT ===");
+  console.log(`📍 Payment ID: ${paymentId}`);
 
   try {
     const hash = await writeContract(config, {
       address: contractAddress,
       abi: PAYSTREAM_ABI,
       functionName: "withdraw",
-      args: [BigInt(streamId)],
+      args: [BigInt(paymentId)],
     });
 
     console.log(`📤 Withdrawal transaction sent: ${hash}`);
@@ -576,97 +576,97 @@ export async function withdrawStream(
     return { transactionHash: hash };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : "Withdrawal failed";
-    console.error("❌ Error withdrawing from stream:", errorMsg);
+    console.error("❌ Error withdrawing from payment:", errorMsg);
     throw new Error(errorMsg);
   }
 }
 
 /**
- * Pause a payment stream
+ * Pause a payment
  */
-export async function pauseStream(
+export async function pausePayment(
   contractAddress: Address,
-  streamId: string
+  paymentId: string
 ): Promise<{ transactionHash: string }> {
-  console.log("\n⏸️ === PAUSE STREAM ===");
-  console.log(`📍 Stream ID: ${streamId}`);
+  console.log("\n⏸️ === PAUSE PAYMENT ===");
+  console.log(`📍 Payment ID: ${paymentId}`);
 
   try {
     const hash = await writeContract(config, {
       address: contractAddress,
       abi: PAYSTREAM_ABI,
-      functionName: "pauseStream",
-      args: [BigInt(streamId)],
+      functionName: "pausePayment",
+      args: [BigInt(paymentId)],
     });
 
     console.log(`📤 Pause transaction sent: ${hash}`);
     const receipt = await waitForTransactionReceipt(config, { hash });
-    console.log(`✅ Stream paused in block ${receipt.blockNumber}`);
+    console.log(`✅ Payment paused in block ${receipt.blockNumber}`);
 
     return { transactionHash: hash };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : "Pause failed";
-    console.error("❌ Error pausing stream:", errorMsg);
+    console.error("❌ Error pausing payment:", errorMsg);
     throw new Error(errorMsg);
   }
 }
 
 /**
- * Resume a paused payment stream
+ * Resume a paused payment
  */
-export async function resumeStream(
+export async function resumePayment(
   contractAddress: Address,
-  streamId: string
+  paymentId: string
 ): Promise<{ transactionHash: string }> {
-  console.log("\n▶️ === RESUME STREAM ===");
-  console.log(`📍 Stream ID: ${streamId}`);
+  console.log("\n▶️ === RESUME PAYMENT ===");
+  console.log(`📍 Payment ID: ${paymentId}`);
 
   try {
     const hash = await writeContract(config, {
       address: contractAddress,
       abi: PAYSTREAM_ABI,
-      functionName: "resumeStream",
-      args: [BigInt(streamId)],
+      functionName: "resumePayment",
+      args: [BigInt(paymentId)],
     });
 
     console.log(`📤 Resume transaction sent: ${hash}`);
     const receipt = await waitForTransactionReceipt(config, { hash });
-    console.log(`✅ Stream resumed in block ${receipt.blockNumber}`);
+    console.log(`✅ Payment resumed in block ${receipt.blockNumber}`);
 
     return { transactionHash: hash };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : "Resume failed";
-    console.error("❌ Error resuming stream:", errorMsg);
+    console.error("❌ Error resuming payment:", errorMsg);
     throw new Error(errorMsg);
   }
 }
 
 /**
- * Cancel a payment stream and refund remaining balance
+ * Cancel a payment and refund remaining balance
  */
-export async function cancelStream(
+export async function cancelPayment(
   contractAddress: Address,
-  streamId: string
+  paymentId: string
 ): Promise<{ transactionHash: string }> {
-  console.log("\n❌ === CANCEL STREAM ===");
-  console.log(`📍 Stream ID: ${streamId}`);
+  console.log("\n❌ === CANCEL PAYMENT ===");
+  console.log(`📍 Payment ID: ${paymentId}`);
 
   try {
     const hash = await writeContract(config, {
       address: contractAddress,
       abi: PAYSTREAM_ABI,
-      functionName: "cancelStream",
-      args: [BigInt(streamId)],
+      functionName: "cancelPayment",
+      args: [BigInt(paymentId)],
     });
 
     console.log(`📤 Cancel transaction sent: ${hash}`);
     const receipt = await waitForTransactionReceipt(config, { hash });
-    console.log(`✅ Stream cancelled in block ${receipt.blockNumber}`);
+    console.log(`✅ Payment cancelled in block ${receipt.blockNumber}`);
 
     return { transactionHash: hash };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : "Cancellation failed";
-    console.error("❌ Error cancelling stream:", errorMsg);
+    console.error("❌ Error cancelling payment:", errorMsg);
     throw new Error(errorMsg);
   }
 }
@@ -678,7 +678,7 @@ export async function cancelStream(
  */
 export async function submitMilestone(
   contractAddress: Address,
-  streamId: string,
+  paymentId: string,
   amount: string,
   descriptionHash: string,
   tokenDecimals: number = 18
@@ -686,7 +686,7 @@ export async function submitMilestone(
   const amountInWei = parseUnits(amount, tokenDecimals);
 
   console.log("\n📤 === SUBMIT MILESTONE ===");
-  console.log(`📍 Stream ID: ${streamId}`);
+  console.log(`📍 Payment ID: ${paymentId}`);
   console.log(`💰 Amount: ${amount} (${amountInWei} wei)`);
   console.log(`📄 Description Hash: ${descriptionHash}`);
 
@@ -695,7 +695,7 @@ export async function submitMilestone(
       address: contractAddress,
       abi: PAYSTREAM_ABI,
       functionName: "submitMilestone",
-      args: [BigInt(streamId), amountInWei],
+      args: [BigInt(paymentId), amountInWei],
     });
 
     console.log(`📤 Milestone submission transaction sent: ${hash}`);

@@ -1,17 +1,17 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Address, parseAbiItem } from 'viem'
 import { usePublicClient } from 'wagmi'
-import { PAYSTREAM_ABI, getTokenSymbol, getTokenDecimals } from '@/lib/contract-interaction' // Import new functions
+import { PAYSTREAM_ABI, getTokenSymbol, getTokenDecimals } from '@/lib/contract-interaction'
 
 const PAYSTREAM_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS as Address
 
-export interface EnrichedStream {
+export interface EnrichedPayment {
   paymentId: number
   company: string
   employee: string
   token: string // token address
-  tokenSymbol: string // Added
-  tokenDecimals: number // Added
+  tokenSymbol: string 
+  tokenDecimals: number
   streamAmount: bigint
   escrowAmount: bigint
   startTime: bigint
@@ -32,9 +32,9 @@ export interface EnrichedStream {
 }
 
 interface UseMyPaymentsReturn {
-  asEmployee: EnrichedStream[]
-  asCompany: EnrichedStream[]
-  asAuditor: EnrichedStream[]
+  asEmployee: EnrichedPayment[]
+  asCompany: EnrichedPayment[]
+  asAuditor: EnrichedPayment[]
   isLoading: boolean
   error: string | null
   refetch: () => Promise<void>
@@ -52,24 +52,24 @@ export function useMyPayments(userAddress: Address | null): UseMyPaymentsReturn 
     refetch: async () => {},
   })
 
-  // Helper: Query stream IDs for a role
-  const queryStreamIds = useCallback(async (
+  // Helper: Query payment IDs for a role
+  const queryPaymentIds = useCallback(async (
     role: 'employee' | 'company' | 'auditor',
     userAddress: Address
   ): Promise<number[]> => {
     if (!publicClient) return [];
     try {
-      let functionName: 'getEmployeeStreams' | 'getCompanyStreams' | 'getAuditorStreams';
+      let functionName: 'getEmployeePayments' | 'getCompanyPayments' | 'getAuditorPayments';
       
       switch (role) {
         case 'employee':
-          functionName = 'getEmployeeStreams';
+          functionName = 'getEmployeePayments';
           break;
         case 'company':
-          functionName = 'getCompanyStreams';
+          functionName = 'getCompanyPayments';
           break;
         case 'auditor':
-          functionName = 'getAuditorStreams';
+          functionName = 'getAuditorPayments';
           break;
       }
 
@@ -81,32 +81,32 @@ export function useMyPayments(userAddress: Address | null): UseMyPaymentsReturn 
       })
       return (ids as bigint[]).map(id => Number(id))
     } catch (error) {
-      console.error(`Error querying streams for ${role}:`, error)
+      console.error(`Error querying payments for ${role}:`, error)
       return []
     }
   }, [publicClient]);
 
-  // Helper: Fetch full stream details
-  const fetchStreamsDetails = useCallback(async (
-    streamIds: number[],
+  // Helper: Fetch full payment details
+  const fetchPaymentsDetails = useCallback(async (
+    paymentIds: number[],
     userRole: 'company' | 'employee' | 'auditor',
-  ): Promise<EnrichedStream[]> => {
-    if (!publicClient || streamIds.length === 0) return []
+  ): Promise<EnrichedPayment[]> => {
+    if (!publicClient || paymentIds.length === 0) return []
 
     try {
-      const streamDetails = await Promise.all(
-        streamIds.map(id =>
+      const paymentDetails = await Promise.all(
+        paymentIds.map(id =>
           publicClient.readContract({
             address: PAYSTREAM_ADDRESS,
             abi: PAYSTREAM_ABI,
-            functionName: 'getStream',
+            functionName: 'getPayment',
             args: [BigInt(id)],
           })
         )
       )
 
       // Fetch token details for all unique tokens in parallel
-      const uniqueTokenAddresses = Array.from(new Set(streamDetails.map(s => (s as any).token)));
+      const uniqueTokenAddresses = Array.from(new Set(paymentDetails.map(p => (p as any).token)));
       const tokenDetailsPromises = uniqueTokenAddresses.map(async (tokenAddress: Address) => {
         const [symbol, decimals] = await Promise.all([
           getTokenSymbol(tokenAddress),
@@ -117,12 +117,12 @@ export function useMyPayments(userAddress: Address | null): UseMyPaymentsReturn 
       const allTokenDetails = Object.assign({}, ...(await Promise.all(tokenDetailsPromises)));
 
 
-      return streamDetails.map((stream, index) => {
-        const s = stream as any // Stream struct from contract
-        const streamId = streamIds[index]
+      return paymentDetails.map((payment, index) => {
+        const p = payment as any // Payment struct from contract
+        const paymentId = paymentIds[index]
         const now = Math.floor(Date.now() / 1000)
-        const startTime = Number(s.startTime)
-        const stopTime = Number(s.stopTime)
+        const startTime = Number(p.startTime)
+        const stopTime = Number(p.stopTime)
         const duration = stopTime - startTime
         const elapsed = Math.max(0, Math.min(now - startTime, duration))
         const progress = duration > 0 ? Math.round((elapsed / duration) * 100) : 0
@@ -131,41 +131,41 @@ export function useMyPayments(userAddress: Address | null): UseMyPaymentsReturn 
         let claimableAmount: bigint | undefined
         if (userRole === 'employee') {
           // Total claimable from stream portion
-          const totalVested = (BigInt(elapsed) * s.streamAmount) / BigInt(duration)
-          claimableAmount = totalVested - s.withdrawn
+          const totalVested = (BigInt(elapsed) * p.streamAmount) / BigInt(duration)
+          claimableAmount = totalVested - p.withdrawn
           // Ensure non-negative
           if (claimableAmount < 0n) claimableAmount = 0n
         }
         
-        const tokenInfo = allTokenDetails[s.token];
+        const tokenInfo = allTokenDetails[p.token];
 
         return {
-          paymentId: streamId,
-          company: s.company,
-          employee: s.employee,
-          token: s.token,
-          tokenSymbol: tokenInfo?.symbol || 'UNKNOWN', // Added
-          tokenDecimals: tokenInfo?.decimals || 18,    // Added
-          streamAmount: s.streamAmount,
-          escrowAmount: s.escrowAmount,
-          startTime: s.startTime,
-          stopTime: s.stopTime,
-          lastWithdrawTime: s.lastWithdrawTime,
-          withdrawn: s.withdrawn,
-          paused: s.paused,
-          cancelled: s.cancelled,
-          totalPausedDuration: s.totalPausedDuration,
-          pausedAt: s.pausedAt,
+          paymentId: paymentId,
+          company: p.company,
+          employee: p.employee,
+          token: p.token,
+          tokenSymbol: tokenInfo?.symbol || 'UNKNOWN', 
+          tokenDecimals: tokenInfo?.decimals || 18,    
+          streamAmount: p.streamAmount,
+          escrowAmount: p.escrowAmount,
+          startTime: p.startTime,
+          stopTime: p.stopTime,
+          lastWithdrawTime: p.lastWithdrawTime,
+          withdrawn: p.withdrawn,
+          paused: p.paused,
+          cancelled: p.cancelled,
+          totalPausedDuration: p.totalPausedDuration,
+          pausedAt: p.pausedAt,
           userRole,
           duration,
           elapsed,
           progress,
-          isActive: !s.paused && !s.cancelled && now < stopTime,
+          isActive: !p.paused && !p.cancelled && now < stopTime,
           claimableAmount,
         }
       })
     } catch (error) {
-      console.error(`Error fetching stream details for ${userRole}:`, error)
+      console.error(`Error fetching payment details for ${userRole}:`, error)
       return []
     }
   }, [publicClient]);
@@ -181,22 +181,22 @@ export function useMyPayments(userAddress: Address | null): UseMyPaymentsReturn 
 
       // Query all 3 role arrays in parallel
       const [employeeIds, companyIds, auditorIds] = await Promise.all([
-        queryStreamIds('employee', userAddress),
-        queryStreamIds('company', userAddress),
-        queryStreamIds('auditor', userAddress),
+        queryPaymentIds('employee', userAddress),
+        queryPaymentIds('company', userAddress),
+        queryPaymentIds('auditor', userAddress),
       ])
 
-      // Fetch full stream details for each ID
-      const [employeeStreams, companyStreams, auditorStreams] = await Promise.all([
-        fetchStreamsDetails(employeeIds, 'employee'),
-        fetchStreamsDetails(companyIds, 'company'),
-        fetchStreamsDetails(auditorIds, 'auditor'),
+      // Fetch full payment details for each ID
+      const [employeePayments, companyPayments, auditorPayments] = await Promise.all([
+        fetchPaymentsDetails(employeeIds, 'employee'),
+        fetchPaymentsDetails(companyIds, 'company'),
+        fetchPaymentsDetails(auditorIds, 'auditor'),
       ])
 
       setData({
-        asEmployee: employeeStreams,
-        asCompany: companyStreams,
-        asAuditor: auditorStreams,
+        asEmployee: employeePayments,
+        asCompany: companyPayments,
+        asAuditor: auditorPayments,
         isLoading: false,
         error: null,
         refetch: fetchPayments,
@@ -210,7 +210,7 @@ export function useMyPayments(userAddress: Address | null): UseMyPaymentsReturn 
         error: errorMsg,
       }))
     }
-  }, [userAddress, publicClient, queryStreamIds, fetchStreamsDetails])
+  }, [userAddress, publicClient, queryPaymentIds, fetchPaymentsDetails])
 
   useEffect(() => {
     fetchPayments()
