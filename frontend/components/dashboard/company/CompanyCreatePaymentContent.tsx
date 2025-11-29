@@ -26,6 +26,7 @@ export default function CompanyCreatePaymentContent() {
   // Escrow Config
   const [isEscrowEnabled, setIsEscrowEnabled] = useState(false);
   const [escrowAmount, setEscrowAmount] = useState("");
+  const [auditorAddress, setAuditorAddress] = useState("");
 
   // Transaction State
   const [isLoading, setIsLoading] = useState(false);
@@ -262,7 +263,17 @@ export default function CompanyCreatePaymentContent() {
                 />
               </div>
               <div className="bg-slate-900/50 p-3 rounded text-sm text-slate-400 mt-8">
-                <p>Funds locked here can be released via milestone submissions later.</p>
+                <label htmlFor="auditor-address" className="block text-slate-300 text-sm font-bold mb-2">
+                  Auditor Address
+                </label>
+                <input
+                  id="auditor-address"
+                  type="text"
+                  placeholder="Leave blank to assign yourself as auditor"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 disabled:opacity-50"
+                  value={auditorAddress}
+                  onChange={(e) => setAuditorAddress(e.target.value)}
+                />
               </div>
             </div>
           </div>
