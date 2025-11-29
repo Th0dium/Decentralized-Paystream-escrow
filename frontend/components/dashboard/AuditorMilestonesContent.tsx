@@ -11,7 +11,7 @@ import { approveMilestone, rejectMilestone } from "@/lib/contract-interaction";
 
 const ITEMS_PER_PAGE = 10;
 
-export default function AuditorMilestonesPage() {
+export default function AuditorMilestonesContent() {
   const { walletAddress, isAuditor } = useAuth();
   const { asAuditor: auditorStreams, isLoading: streamsLoading, refetch: refetchStreams } = useMyPayments(walletAddress as any);
   const { milestones, isLoading: milestonesLoading, refetch: refetchMilestones } = useMyMilestones(walletAddress as any, 'auditor');

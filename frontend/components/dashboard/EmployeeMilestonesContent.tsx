@@ -10,7 +10,7 @@ import { formatUnits } from "viem";
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
 
-export default function MilestonesPage() {
+export default function EmployeeMilestonesContent() {
   const { walletAddress, isEmployee } = useAuth();
   const { milestones, isLoading, refetch } = useMyMilestones(walletAddress as any, 'employee');
   const [isClaimingId, setIsClaimingId] = useState<number | null>(null);

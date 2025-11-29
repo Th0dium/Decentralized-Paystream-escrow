@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/hooks";
+import { useDashboardStore } from "@/lib/dashboard-store"; // Import the new store
+
+type DashboardView = 'overview' | 'employee' | 'company' | 'auditor';
 
 interface MenuSection {
   title?: string;
@@ -13,25 +16,38 @@ interface MenuItem {
   href: string;
   label: string;
   show: boolean;
+  view: DashboardView; // New prop to store associated view
 }
 
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { logout } = useAuth();
+  const { activeDashboardView, setActiveDashboardView } = useDashboardStore();
 
   const handleLogout = () => {
     logout();
     router.push("/");
   };
 
+  const handleDashboardLinkClick = (e: React.MouseEvent, href: string, view: DashboardView) => {
+    e.preventDefault(); // Prevent default Link behavior
+    setActiveDashboardView(view);
+    router.push(href);
+  };
+
+  const isLinkActive = (item: MenuItem) => {
+    // Check if we're on dashboard path AND the dashboard's active view matches this link's view
+    return pathname === "/dashboard" && activeDashboardView === item.view;
+  }
+
   const menuSections: MenuSection[] = [
     {
       items: [
-        { href: "/dashboard", label: "Overview", show: true },
-        { href: "/dashboard/employee", label: "Employee Hub", show: true },
-        { href: "/dashboard/company", label: "Company Hub", show: true },
-        { href: "/dashboard/auditor", label: "Auditor Hub", show: true },
+        { href: "/dashboard", label: "Overview", show: true, view: "overview" },
+        { href: "/dashboard", label: "Employee", show: true, view: "employee" },
+        { href: "/dashboard", label: "Company", show: true, view: "company" },
+        { href: "/dashboard", label: "Auditor", show: true, view: "auditor" },
       ],
     },
   ];
@@ -53,10 +69,11 @@ export default function Sidebar() {
               <div className="space-y-2">
                 {visibleItems.map((item) => (
                   <Link
-                    key={item.href}
+                    key={item.label} // Use label as key
                     href={item.href}
+                    onClick={(e) => handleDashboardLinkClick(e, item.href, item.view)}
                     className={`block px-4 py-2 rounded-lg transition-colors ${
-                      pathname === item.href
+                      isLinkActive(item)
                         ? "bg-blue-600 text-white"
                         : "text-slate-300 hover:bg-slate-700"
                     }`}
