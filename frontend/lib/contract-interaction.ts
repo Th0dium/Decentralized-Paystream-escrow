@@ -14,6 +14,7 @@ export const PAYSTREAM_ABI = [
     anonymous: false,
     inputs: [
       { indexed: true, internalType: "uint256", name: "paymentId", type: "uint256" },
+      { indexed: false, internalType: "string", name: "name", type: "string" },
       { indexed: true, internalType: "address", name: "company", type: "address" },
       { indexed: true, internalType: "address", name: "employee", type: "address" },
       { indexed: false, internalType: "address", name: "token", type: "address" },
@@ -39,6 +40,7 @@ export const PAYSTREAM_ABI = [
     outputs: [
       {
         components: [
+          { internalType: "string", name: "name", type: "string" },
           { internalType: "address", name: "company", type: "address" },
           { internalType: "address", name: "employee", type: "address" },
           { internalType: "address", name: "token", type: "address" }, 
@@ -66,6 +68,7 @@ export const PAYSTREAM_ABI = [
     inputs: [{ internalType: "uint256", name: "", type: "uint256" }],
     name: "payments",
     outputs: [
+      { internalType: "string", name: "name", type: "string" },
       { internalType: "address", name: "company", type: "address" },
       { internalType: "address", name: "employee", type: "address" },
       { internalType: "address", name: "token", type: "address" },
@@ -143,6 +146,7 @@ export const PAYSTREAM_ABI = [
   // --- Write Functions ---
   {
     inputs: [
+      { internalType: "string", name: "name", type: "string" },
       { internalType: "address", name: "employee", type: "address" },
       { internalType: "address", name: "token", type: "address" },
       { internalType: "uint256", name: "streamAmount", type: "uint256" },
@@ -304,7 +308,7 @@ export async function getEmployeePayments(
   // We look for PaymentCreated events where the 3rd indexed argument (employee) matches
   const logs = await publicClient.getLogs({
     address: contractAddress,
-    event: parseAbiItem('event PaymentCreated(uint256 indexed paymentId, address indexed company, address indexed employee, address token, uint256 streamAmount, uint256 escrowAmount, uint64 startTime, uint64 stopTime)'),
+    event: parseAbiItem('event PaymentCreated(uint256 indexed paymentId, string name, address indexed company, address indexed employee, address token, uint256 streamAmount, uint256 escrowAmount, uint64 startTime, uint64 stopTime)'),
     args: {
       employee: employeeAddress,
     },
@@ -353,7 +357,7 @@ export async function getCompanyPayments(
   // 1. Get Logs (Indexed Query)
   const logs = await publicClient.getLogs({
     address: contractAddress,
-    event: parseAbiItem('event PaymentCreated(uint256 indexed paymentId, address indexed company, address indexed employee, address token, uint256 streamAmount, uint256 escrowAmount, uint64 startTime, uint64 stopTime)'),
+    event: parseAbiItem('event PaymentCreated(uint256 indexed paymentId, string name, address indexed company, address indexed employee, address token, uint256 streamAmount, uint256 escrowAmount, uint64 startTime, uint64 stopTime)'),
     args: {
       company: companyAddress,
     },
@@ -420,6 +424,7 @@ export async function approveTokens(
  */
 export async function createPayment(
   contractAddress: Address,
+  name: string,
   employeeAddress: Address,
   tokenAddress: Address,
   streamAmount: string,
@@ -439,6 +444,7 @@ export async function createPayment(
 
   console.log("\n💰 === CREATE PAYMENT (viem) ===");
   console.log(`📍 Contract: ${contractAddress}`);
+  console.log(`📝 Name: ${name}`);
   console.log(`👤 Employee: ${employeeAddress}`);
   console.log(`💰 Stream Amount: ${streamAmount} tokens (${streamAmountInWei} wei)`);
   console.log(`🎯 Escrow Amount: ${escrowAmount} tokens (${escrowAmountInWei} wei)`);
@@ -452,6 +458,7 @@ export async function createPayment(
         abi: PAYSTREAM_ABI,
         functionName: "createPayment",
         args: [
+            name,
             employeeAddress,
             tokenAddress,
             streamAmountInWei,
