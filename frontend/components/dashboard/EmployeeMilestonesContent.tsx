@@ -95,7 +95,7 @@ export default function EmployeeMilestonesContent() {
                     Milestone #{milestone.milestoneId}
                   </h3>
                   <p className="text-sm text-slate-400">
-                    Stream #{milestone.streamId}
+                    {milestone.paymentName} (#{milestone.paymentId})
                   </p>
                 </div>
                 <span

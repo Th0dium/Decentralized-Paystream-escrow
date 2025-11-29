@@ -5,7 +5,7 @@ import { Card } from "@/components/Card";
 import { useAuth } from "@/lib/hooks";
 import { useMyPayments, EnrichedPayment } from "@/lib/hooks/useMyPayments";
 import { formatUnits } from "viem";
-import { withdrawStream } from "@/lib/contract-interaction"; // Import withdrawStream directly if not handled by generic handler or adjust handler
+import { withdrawPayment } from "@/lib/contract-interaction"; // Import withdrawPayment correctly
 import { Button } from "@/components/Button"; 
 import PaymentDetailsModal from "@/components/PaymentDetailsModal";
 
@@ -34,7 +34,7 @@ export default function EmployeeStreamsContent() {
       const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
       if (!contractAddress) throw new Error("Contract address not configured");
 
-      await withdrawStream(contractAddress as any, paymentId.toString());
+      await withdrawPayment(contractAddress as any, paymentId.toString());
       // Refetch after withdraw and close modal
       await refetch();
       setSelectedPayment(null);
