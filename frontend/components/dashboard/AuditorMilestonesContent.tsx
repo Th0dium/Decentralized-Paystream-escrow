@@ -4,16 +4,16 @@ import { useState } from "react";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { useAuth } from "@/lib/hooks";
-import { useMyMilestones, MilestoneStatus } from "@/lib/hooks/useMyMilestones";
+import { useMyMilestones, MilestoneStatus, EnrichedMilestone } from "@/lib/hooks/useMyMilestones";
 import { formatUnits } from "viem";
 import { approveMilestone, rejectMilestone } from "@/lib/contract-interaction";
+import MilestoneEvidenceModal from "@/components/MilestoneEvidenceModal";
 
 export default function AuditorMilestonesContent() {
   const { walletAddress } = useAuth();
   const { milestones, isLoading, error, refetch } = useMyMilestones(walletAddress as any, "auditor");
   const [activeTab, setActiveTab] = useState<"pending" | "history">("pending");
-  const [actionId, setActionId] = useState<number | null>(null);
-  const [actionType, setActionType] = useState<"approve" | "reject" | null>(null);
+  const [selectedMilestone, setSelectedMilestone] = useState<EnrichedMilestone | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Filter milestones based on tab
@@ -22,28 +22,37 @@ export default function AuditorMilestonesContent() {
     return m.status !== MilestoneStatus.PENDING;
   });
 
-  const handleAction = async (id: number, type: "approve" | "reject") => {
-    setActionId(id);
-    setActionType(type);
+  const handleApprove = async (id: number) => {
     setIsSubmitting(true);
 
     try {
       const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
       if (!contractAddress) throw new Error("Contract address not configured");
 
-      if (type === "approve") {
-        await approveMilestone(contractAddress as any, id.toString());
-      } else {
-        await rejectMilestone(contractAddress as any, id.toString());
-      }
+      await approveMilestone(contractAddress as any, id.toString());
       await refetch();
     } catch (err) {
-      console.error("Action failed:", err);
-      alert("Action failed. Check console for details.");
+      console.error("Approve failed:", err);
+      alert("Approve failed. Check console for details.");
     } finally {
       setIsSubmitting(false);
-      setActionId(null);
-      setActionType(null);
+    }
+  };
+
+  const handleReject = async (id: number) => {
+    setIsSubmitting(true);
+
+    try {
+      const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
+      if (!contractAddress) throw new Error("Contract address not configured");
+
+      await rejectMilestone(contractAddress as any, id.toString());
+      await refetch();
+    } catch (err) {
+      console.error("Reject failed:", err);
+      alert("Reject failed. Check console for details.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -116,10 +125,9 @@ export default function AuditorMilestonesContent() {
                     <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Payment</th>
                     <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Amount</th>
                     <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Status</th>
+                    <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Evidence</th>
                     <th className="p-4 text-slate-400 font-medium border-b border-slate-700">Date</th>
-                    {activeTab === "pending" && (
-                      <th className="p-4 text-slate-400 font-medium border-b border-slate-700 text-right">Actions</th>
-                    )}
+                    <th className="p-4 text-slate-400 font-medium border-b border-slate-700 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700">
@@ -148,33 +156,29 @@ export default function AuditorMilestonesContent() {
                           {MilestoneStatus[milestone.status]}
                         </span>
                       </td>
+                      <td className="p-4">
+                        {milestone.encryptedEvidenceHash ? (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-900/30 text-purple-300 border border-purple-700/50">
+                            🔐 Encrypted
+                          </span>
+                        ) : (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-slate-700/30 text-slate-400">
+                            None
+                          </span>
+                        )}
+                      </td>
                       <td className="p-4 text-slate-400 text-sm">
                         {new Date(milestone.createdAt * 1000).toLocaleDateString()}
                       </td>
-                      {activeTab === "pending" && (
-                        <td className="p-4 text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              onClick={() => handleAction(milestone.milestoneId, "approve")}
-                              variant="success"
-                              className="text-xs py-1 px-3 h-auto"
-                              loading={actionId === milestone.milestoneId && actionType === "approve" && isSubmitting}
-                              disabled={isSubmitting}
-                            >
-                              Approve
-                            </Button>
-                            <Button
-                              onClick={() => handleAction(milestone.milestoneId, "reject")}
-                              variant="danger"
-                              className="text-xs py-1 px-3 h-auto"
-                              loading={actionId === milestone.milestoneId && actionType === "reject" && isSubmitting}
-                              disabled={isSubmitting}
-                            >
-                              Reject
-                            </Button>
-                          </div>
-                        </td>
-                      )}
+                      <td className="p-4 text-right">
+                        <Button
+                          onClick={() => setSelectedMilestone(milestone)}
+                          variant="secondary"
+                          className="text-xs py-1 px-3 h-auto"
+                        >
+                          📋 Review
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -183,6 +187,15 @@ export default function AuditorMilestonesContent() {
           </div>
         </div>
       )}
+
+      <MilestoneEvidenceModal
+        isOpen={!!selectedMilestone}
+        closeModal={() => setSelectedMilestone(null)}
+        milestone={selectedMilestone}
+        onApprove={handleApprove}
+        onReject={handleReject}
+        isSubmitting={isSubmitting}
+      />
     </div>
   );
 }

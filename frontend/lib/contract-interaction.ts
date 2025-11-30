@@ -139,6 +139,7 @@ export const PAYSTREAM_ABI = [
           { internalType: "enum Paystream.MilestoneStatus", name: "status", type: "uint8" },
           { internalType: "uint256", name: "createdAt", type: "uint256" },
           { internalType: "uint256", name: "approvedAt", type: "uint256" },
+          { internalType: "string", name: "encryptedEvidenceHash", type: "string" },
         ],
         internalType: "struct Paystream.Milestone",
         name: "",
@@ -286,12 +287,17 @@ const ERC20_ABI = [
 export async function getTokenSymbol(
   tokenAddress: Address,
 ): Promise<string> {
-  const symbol = await readContract(config, {
-    address: tokenAddress,
-    abi: ERC20_ABI,
-    functionName: 'symbol',
-  });
-  return symbol as string;
+  try {
+    const symbol = await readContract(config, {
+      address: tokenAddress,
+      abi: ERC20_ABI,
+      functionName: 'symbol',
+    });
+    return symbol as string;
+  } catch (error) {
+    console.warn(`Failed to fetch symbol for token ${tokenAddress}:`, error);
+    return 'UNKNOWN';
+  }
 }
 
 /**
@@ -551,12 +557,17 @@ export async function getTokenBalance(
 export async function getTokenDecimals(
   tokenAddress: Address,
 ): Promise<number> {
-  const decimals = await readContract(config, {
-    address: tokenAddress,
-    abi: ERC20_ABI,
-    functionName: 'decimals',
-  });
-  return decimals;
+  try {
+    const decimals = await readContract(config, {
+      address: tokenAddress,
+      abi: ERC20_ABI,
+      functionName: 'decimals',
+    });
+    return decimals as number;
+  } catch (error) {
+    console.warn(`Failed to fetch decimals for token ${tokenAddress}:`, error);
+    return 18; // Default to 18 decimals
+  }
 }
 
 /**

@@ -11,7 +11,8 @@
       "Bash(npm install:*)",
       "Bash(where npm)",
       "Bash(git checkout:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npx hardhat:*)"
     ],
     "deny": [],
     "ask": []
