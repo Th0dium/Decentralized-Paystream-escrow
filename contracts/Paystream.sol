@@ -480,7 +480,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
         Payment storage p = payments[m.paymentId];
         require(msg.sender == p.auditor, "not payment auditor");
-        // require(p.auditor != m.submitter, "auditor cannot be submitter"); // Allow self-auditing for testing
+        require(p.auditor != m.submitter, "auditor cannot be submitter");
 
         m.status = MilestoneStatus.APPROVED;
         m.approvedAt = block.timestamp;
@@ -495,7 +495,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
         Payment storage p = payments[m.paymentId];
         require(msg.sender == p.auditor, "not payment auditor");
-        // require(p.auditor != m.submitter, "auditor cannot be submitter"); // Allow self-auditing for testing
+        require(p.auditor != m.submitter, "auditor cannot be submitter");
 
         m.status = MilestoneStatus.REJECTED;
 

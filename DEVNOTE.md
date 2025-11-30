@@ -1,120 +1,74 @@
-# Paystream Architecture Decisions
+# Paystream Architecture & Development Notes
 
-This document outlines the key architectural decisions for the Paystream project, covering the smart contract, backend, and frontend.
+This document tracks architectural decisions and the evolution of the codebase, serving as a technical changelog and decision log.
 
 ---
 
-## 1. Smart Contract: Dual Protocol Model
+## 1. Core Architecture: Pure Web3 (No-Backend)
 
-**Decision:** Implement two separate but related protocols within a single `Paystream.sol` contract: a Payment Protocol for time-based streaming and an Escrow Protocol for milestone-based payments.
+**Decision (Updated):** The project has shifted from a Backend-Indexer model to a **Pure Web3** architecture.
+- **Old Model:** Node.js Backend listening to events -> Database -> Frontend API.
+- **Current Model:** Frontend (Next.js) -> Direct JSON-RPC Calls (Wagmi/Viem) -> Smart Contract.
 
 **Why:**
-- **Clarity:** Separating the logic for streaming and escrow makes the contract easier to understand and audit.
-- **Flexibility:** Companies can choose the protocol that best suits their needs—streaming for salaries, escrow for project milestones, or both.
-- **Gas Efficiency:** Users only interact with the parts of the contract they need, avoiding unnecessary gas costs.
+- **Simplicity:** Reduces infrastructure complexity and maintenance costs.
+- **Trustlessness:** Users query data directly from the blockchain, ensuring data integrity without relying on a centralized indexer.
+- **Development Speed:** Rapid iteration on frontend features without needing backend synchronization.
 
-**How it works:**
-- **Payment Protocol:** Creates a stream that unlocks tokens linearly over time. The employee can withdraw accrued funds at any point.
-- **Escrow Protocol:** Creates a milestone-based payment that is locked until an auditor approves it. Escrows can be standalone or linked to a payment stream.
+**Implication:** All data fetching (My Payments, My Milestones) now happens via `useContractRead` hooks or direct `publicClient.readContract` calls in the frontend, aggregating data client-side.
 
 ---
 
-## 2. Roles and Permissions
+## 2. Smart Contract: Hybrid Payment Protocol
 
-**Decision:** Use a role-based system to manage access and permissions, leveraging OpenZeppelin's `AccessControl`.
+**Design:** A single contract (`Paystream.sol`) handling two payment types simultaneously:
+1.  **Streaming:** Linear vesting (salary).
+2.  **Escrow:** Milestone-based unlocking (bonuses/deliverables).
 
-**Roles:**
-1.  **Admin (`DEFAULT_ADMIN_ROLE`):** Manages contract-level settings like platform fees and can pause the creation of new payments.
-2.  **Company:** Creates payment streams and escrows, and assigns auditors.
-3.  **Employee:** The recipient of payments and escrows. Can withdraw from streams and claim approved escrows.
-4.  **Auditor:** Approves or rejects escrows. Auditors are assigned by the company on a per-payment or per-escrow basis.
-
-**Why:** This separation of concerns enhances security by ensuring that each participant only has the permissions necessary for their role.
+**Security Evolution:**
+- **Role Checks:** Strict `require` statements ensure `Company != Employee` and `Auditor != Employee` in production code.
+- *Note:* During local development, these checks may be temporarily commented out to allow "Self-Testing" (Single Wallet Testing), but must be restored for deployment.
 
 ---
 
-## 3. Backend Event Indexer
+## 3. Evidence Privacy & Encryption Mechanism
 
-**Decision:** A Node.js backend listens for events emitted by the smart contract and indexes them in a PostgreSQL database.
+**Problem:** Evidence files (PDFs/images) uploaded to IPFS are public by default. Companies need confidentiality.
 
-**Why:**
-- **Performance:** Direct blockchain queries for historical data are slow and resource-intensive. The indexed database provides a fast and efficient way to retrieve information.
-- **Enhanced UX:** The frontend can quickly fetch data like a user's payment streams or escrows, providing a smoother user experience.
-- **Scalability:** This approach scales well, even with a large number of on-chain transactions.
+**Solution:** Client-side **Hybrid Encryption (NaCl Sealed Box)**.
 
----
+**Evolution of Implementation:**
+1.  **Initial Idea:** Auditor generates keypair -> Company uses it.
+    *   *Flaw:* Requires Auditor to be online/active before payment creation.
+2.  **Iteration 1 (Auto-gen):** Company generates keys for Auditor.
+    *   *Bug:* Missing `ephemeralPublicKey` in payload caused "Decryption Failed" errors.
+    *   *Fix:* Updated encryption lib to include sender's ephemeral key in the JSON payload.
+3.  **Final Model (Shared Password):**
+    *   Company generates a "Auditor Password" (Secret Key) during Payment Creation.
+    *   Company shares this Password securely with the Auditor off-chain.
+    *   Auditor enters Password to decrypt evidence.
+    *   **Opt-in:** Encryption is optional. Companies can choose "Public Mode" (no keys, plain IPFS).
 
-## 4. Backend User Roles
-
-**Decision:** The backend now includes a role management system for users, distinct from the smart contract roles. Each user in the database has boolean flags: `isCompany`, `isEmployee`, and `isAuditor`.
-
-**Why:**
-- **Foundation for Off-Chain Logic:** This system allows the backend to begin differentiating users, which is a prerequisite for building role-specific APIs and authorization.
-- **Future-Proofing:** It prepares the application for more complex off-chain features, such as dashboards tailored to different user types.
-
-**Current Implementation:**
--   Upon wallet verification, a `User` record is created in the database.
--   By default, all role flags (`isCompany`, `isEmployee`, `isAuditor`) are set to `false`.
--   **Crucially, the backend does not yet enforce these roles.** The authentication middleware verifies a user's wallet but does not restrict access to endpoints based on their role. This is a pending development task.
-
----
-
-## 5. Frontend and State Management
-
-**Decision:** The frontend is built with Next.js, TypeScript, and Tailwind CSS. It interacts with both the blockchain (for transactions) and the backend (for data).
-
-**State Management Philosophy:**
-- **Blockchain as the Single Source of Truth:** All financial states and transactions are managed by the smart contract.
-- **Backend as a Fast Read-Layer:** The backend provides a cached, indexed version of the blockchain data for quick retrieval.
-- **Frontend State:** The frontend does not cache financial data. It fetches data from the backend for display and initiates transactions with the blockchain. After a transaction, it re-fetches data to ensure the UI is up-to-date.
+**Technical Details:**
+- **Algo:** Curve25519 (ECDH) + XSalsa20 + Poly1305.
+- **Payload:** `{ nonce, ciphertext, ephemeralPublicKey }`.
+- **Storage:** Only the JSON payload (or plain IPFS hash) is stored on-chain.
 
 ---
 
-## 6. Authentication
+## 4. UX Improvements
 
-**Decision:** Wallet-based authentication is used. Users sign a message to prove ownership of their address, and the backend issues a session token (JWT) for subsequent API requests.
+**Claiming Funds:**
+- **Issue:** Employees didn't know they had to manually claim funds after approval.
+- **Fix:** Added a "My Milestones" view with a clear "Claim Funds" button that appears only when Status = Approved.
 
-**Why:** This is the standard for Web3 applications, providing a secure and user-friendly way to authenticate without relying on traditional email/password credentials.
-
----
-
-## 7. Token Handling: Whitelisted `IERC20` Tokens
-
-**Decision:** To enhance security and align with the project's focus, the contract will not accept any arbitrary ERC-20 token. Instead, it maintains an on-chain "whitelist" of approved tokens.
-
-**Why:**
-- **Security:** This prevents interactions with potentially malicious or non-standard tokens, reducing the risk of unexpected behavior or exploits.
-- **Controlled Scope:** It ensures the platform is only used with established, high-quality tokens like stablecoins, which aligns with the intended business logic.
-- **Simplified UX:** The frontend and backend only need to support a known list of tokens, simplifying development and improving the user experience.
-
-**Implementation:**
-- A `mapping(address => bool) public isTokenWhitelisted;` stores the approved token addresses.
-- The `constructor` pre-populates the whitelist with USDC, USDT, and DAI addresses for the Ethereum Mainnet.
-- A new admin function, `updateTokenWhitelist(address token, bool status)`, allows the `DEFAULT_ADMIN_ROLE` to manage the list.
-- The `createPayment` and `createEscrow` functions now include a `require(isTokenWhitelisted[token], ...)` check to enforce this rule.
+**Sidebar Navigation:**
+- **Issue:** Generic menus confused users about their roles.
+- **Fix:** Restructured Sidebar into role-specific sections: `Employee`, `Company`, `Auditor`.
 
 ---
 
-## Architecture Summary
+## 5. Known Limitations & Future Work
 
-```
-┌────────────────────────────────┐
-│  Frontend (Next.js on Vercel)  │
-│  - UI & Wallet Interaction     │
-│  - Sends Transactions          │
-└────────────────────────────────┘
-         ↓ ↑ (API Calls)      ↓ (Transactions)
-         ↓ ↑                  ↓
-┌──────────────────┐    ┌──────────────────┐
-│  Backend (Node.js) │    │   Blockchain     │
-│  - Event Indexer  │←───┤ (Paystream.sol)  │
-│  - Database (SQL)│    │   - Holds Funds    │
-│  - REST API      │    │   - Enforces Rules │
-└──────────────────┘    └──────────────────┘
-```
-
-**Workflow:**
-1.  **Write Operations (e.g., creating a payment):** The frontend prompts the user to sign a transaction, which is sent directly to the blockchain.
-2.  **Events:** The smart contract emits an event upon a successful transaction.
-3.  **Indexing:** The backend service listens for these events and updates the database.
-4.  **Read Operations (e.g., viewing payments):** The frontend queries the backend's REST API, which returns the indexed data from the database.
+- **Gas Costs:** Pure Web3 approach requires multiple RPC calls to fetch lists (looping through IDs). Future optimization might involve a Subgraph (The Graph) for efficient indexing.
+- **Key Management:** Currently relies on manual key sharing. Future version could implement on-chain PKI (Public Key Infrastructure) where Auditors register their Public Keys in a profile contract.
