@@ -11,6 +11,7 @@ export interface EnrichedPayment {
   company: string
   employee: string
   auditor: string
+  auditorPublicKey: string // Base64-encoded public key for evidence encryption
   token: string // token address
   tokenSymbol: string
   tokenDecimals: number
@@ -148,6 +149,7 @@ export function useMyPayments(userAddress: Address | null): UseMyPaymentsReturn 
           company: p.company,
           employee: p.employee,
           auditor: p.auditor,
+          auditorPublicKey: p.auditorPublicKey,
           token: p.token,
           tokenSymbol: tokenInfo?.symbol || 'UNKNOWN',
           tokenDecimals: tokenInfo?.decimals || 18,

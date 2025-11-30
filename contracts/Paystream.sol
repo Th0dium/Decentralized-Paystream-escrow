@@ -35,6 +35,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
         address company;
         address employee;
         address auditor; // Auditor for the entire payment
+        string auditorPublicKey; // Base64-encoded public key for evidence encryption (NaCl Box format)
         IERC20 token;
         uint256 streamAmount; // Amount for continuous streaming
         uint256 escrowAmount; // Initial escrow amount locked for milestones
@@ -113,6 +114,13 @@ contract Paystream is ReentrancyGuard, AccessControl {
         uint256 indexed paymentId,
         address indexed submitter,
         uint256 amount
+    );
+    event MilestoneSubmittedWithEvidence(
+        uint256 indexed milestoneId,
+        uint256 indexed paymentId,
+        address indexed submitter,
+        uint256 amount,
+        string encryptedEvidenceHash
     );
     event MilestoneApproved(
         uint256 indexed milestoneId,
@@ -194,6 +202,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
      * @param name Name/Title of the payment
      * @param employee Address receiving the payment
      * @param auditor Address of the auditor for milestones. If address(0), company is the auditor.
+     * @param auditorPublicKey Base64-encoded public key of auditor (NaCl Box format) for encrypting evidence
      * @param token ERC20 token address
      * @param streamAmount Amount to stream continuously over duration
      * @param escrowAmount Amount to lock in escrow for milestones
@@ -205,6 +214,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
         string memory name,
         address employee,
         address auditor,
+        string memory auditorPublicKey,
         address token,
         uint256 streamAmount,
         uint256 escrowAmount,
@@ -230,6 +240,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
         address finalAuditor = auditor == address(0) ? msg.sender : auditor;
         require(finalAuditor != employee, "auditor cannot be employee");
+        require(bytes(auditorPublicKey).length > 0, "auditor public key required");
 
         uint256 totalAmount = streamAmount + escrowAmount;
 
@@ -243,8 +254,9 @@ contract Paystream is ReentrancyGuard, AccessControl {
             name: name,
             company: msg.sender,
             employee: employee,
-            token: erc20,
             auditor: finalAuditor,
+            auditorPublicKey: auditorPublicKey,
+            token: erc20,
             streamAmount: streamAmount,
             escrowAmount: escrowAmount,
             startTime: startTime,
@@ -409,6 +421,49 @@ contract Paystream is ReentrancyGuard, AccessControl {
         employeeMilestones[msg.sender].push(milestoneId);
 
         emit MilestoneSubmitted(milestoneId, paymentId, msg.sender, amount);
+        return milestoneId;
+    }
+
+    /**
+     * @notice Submit a milestone with encrypted evidence
+     * Submits a milestone and includes encrypted evidence (IPFS hash encrypted with auditor's public key)
+     * @param paymentId The payment this milestone is for
+     * @param amount The amount of escrow being claimed
+     * @param encryptedEvidenceHash JSON string containing {nonce, ciphertext, publicKey} (base64 encoded)
+     * @return milestoneId The created milestone ID
+     */
+    function submitMilestoneWithEvidence(
+        uint256 paymentId,
+        uint256 amount,
+        string memory encryptedEvidenceHash
+    ) external returns (uint256) {
+        Payment storage p = payments[paymentId];
+        require(p.company != address(0), "payment does not exist");
+        require(msg.sender == p.employee, "not employee");
+        require(amount > 0, "amount must be > 0");
+        require(amount <= p.escrowed, "exceeds available escrow");
+        require(bytes(encryptedEvidenceHash).length > 0, "encrypted evidence required");
+
+        uint256 milestoneId = _nextMilestoneId++;
+        milestones[milestoneId] = Milestone({
+            paymentId: paymentId,
+            submitter: msg.sender,
+            amount: amount,
+            status: MilestoneStatus.PENDING,
+            createdAt: block.timestamp,
+            approvedAt: 0
+        });
+
+        paymentMilestones[paymentId].push(milestoneId);
+        employeeMilestones[msg.sender].push(milestoneId);
+
+        emit MilestoneSubmittedWithEvidence(
+            milestoneId,
+            paymentId,
+            msg.sender,
+            amount,
+            encryptedEvidenceHash
+        );
         return milestoneId;
     }
 
