@@ -45,7 +45,13 @@ export default function Sidebar() {
         { href: "/dashboard", label: "Overview", show: true, view: "overview" },
         { href: "/dashboard", label: "Employee", show: true, view: "employee-streams" }, // Direct to streams
         { href: "/dashboard", label: "Company", show: true, view: "company-streams" }, // Direct to streams list
-        { href: "/dashboard", label: "Auditor", show: true, view: "auditor-milestones" }, // Direct to milestones
+      ],
+    },
+    {
+      title: "Auditor",
+      items: [
+        { href: "/dashboard", label: "Payments", show: true, view: "auditor-payments" },
+        { href: "/dashboard", label: "Milestones", show: true, view: "auditor-milestones" },
       ],
     },
   ];

@@ -4,6 +4,7 @@ import { useDashboardStore } from "@/lib/dashboard-store";
 import OverviewContent from "@/components/dashboard/OverviewContent";
 import EmployeeStreamsContent from "@/components/dashboard/EmployeeStreamsContent";
 import CompanyCreatePaymentContent from "@/components/dashboard/company/CompanyCreatePaymentContent";
+import AuditorPaymentsContent from "@/components/dashboard/AuditorPaymentsContent";
 import AuditorMilestonesContent from "@/components/dashboard/AuditorMilestonesContent";
 import AdminWhitelistTokenContent from "@/components/dashboard/admin/AdminWhitelistTokenContent";
 
@@ -27,6 +28,8 @@ export default function DashboardPage() {
         return <EmployeeStreamsContent />;
       case "company-create-payment":
         return <CompanyCreatePaymentContent />;
+      case "auditor-payments":
+        return <AuditorPaymentsContent />;
       case "auditor-milestones":
         return <AuditorMilestonesContent />;
 
