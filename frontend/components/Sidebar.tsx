@@ -41,17 +41,30 @@ export default function Sidebar() {
 
   const menuSections: MenuSection[] = [
     {
+      title: "Overview",
       items: [
-        { href: "/dashboard", label: "Overview", show: true, view: "overview" },
-        { href: "/dashboard", label: "Employee", show: true, view: "employee-streams" }, // Direct to streams
-        { href: "/dashboard", label: "Company", show: true, view: "company-streams" }, // Direct to streams list
+        { href: "/dashboard", label: "Dashboard", show: true, view: "overview" },
+      ]
+    },
+    {
+      title: "Employee",
+      items: [
+        { href: "/dashboard", label: "My Streams", show: true, view: "employee-streams" },
+        { href: "/dashboard", label: "My Milestones", show: true, view: "employee-milestones" },
+      ],
+    },
+    {
+      title: "Company",
+      items: [
+        { href: "/dashboard", label: "Create Payment", show: true, view: "company-create-payment" },
+        { href: "/dashboard", label: "Manage Payments", show: true, view: "company-streams" },
       ],
     },
     {
       title: "Auditor",
       items: [
-        { href: "/dashboard", label: "Payments", show: true, view: "auditor-payments" },
-        { href: "/dashboard", label: "Milestones", show: true, view: "auditor-milestones" },
+        { href: "/dashboard", label: "Audit Payments", show: true, view: "auditor-payments" },
+        { href: "/dashboard", label: "Review Milestones", show: true, view: "auditor-milestones" },
       ],
     },
   ];

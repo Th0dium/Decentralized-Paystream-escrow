@@ -17,6 +17,7 @@ export interface EnrichedPayment {
   tokenDecimals: number
   streamAmount: bigint
   escrowAmount: bigint
+  escrowed: bigint // Current amount remaining in escrow
   startTime: bigint
   stopTime: bigint
   lastWithdrawTime: bigint
@@ -155,6 +156,7 @@ export function useMyPayments(userAddress: Address | null): UseMyPaymentsReturn 
           tokenDecimals: tokenInfo?.decimals || 18,
           streamAmount: p.streamAmount,
           escrowAmount: p.escrowAmount,
+          escrowed: p.escrowed,
           startTime: p.startTime,
           stopTime: p.stopTime,
           lastWithdrawTime: p.lastWithdrawTime,

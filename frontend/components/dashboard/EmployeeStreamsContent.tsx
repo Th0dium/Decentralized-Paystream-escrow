@@ -119,7 +119,7 @@ export default function EmployeeStreamsContent() {
       setUploadModalPayment(null);
 
       if (auditorPublicKey && auditorPublicKey.length > 0) {
-        alert("✅ Evidence uploaded successfully! The Auditor can now decrypt it using the Private Key provided by the Company.");
+        alert("✅ Evidence uploaded successfully! The Auditor can now decrypt it using the Password provided by the Company.");
       } else {
         alert("✅ Evidence uploaded successfully! The file is publicly accessible via IPFS.");
       }
@@ -211,8 +211,12 @@ export default function EmployeeStreamsContent() {
                     </div>
 
                     <div className="flex justify-between text-sm mb-2">
-                        <div className="text-slate-400">
-                            Total: <span className="text-slate-200">{formatUnits(stream.streamAmount + stream.escrowAmount, stream.tokenDecimals)} {stream.tokenSymbol}</span>
+                        <div className="text-slate-400 flex gap-3">
+                            <span>Stream: <span className="text-slate-200">{formatUnits(stream.streamAmount, stream.tokenDecimals)}</span></span>
+                            {stream.escrowAmount > 0n && (
+                                <span>Escrow: <span className="text-slate-200">{formatUnits(stream.escrowed, stream.tokenDecimals)}</span></span>
+                            )}
+                             <span className="text-slate-400 text-xs self-center">{stream.tokenSymbol}</span>
                         </div>
                          <div className="text-slate-400">
                             Progress: <span className="text-blue-400">{stream.progress}%</span>
