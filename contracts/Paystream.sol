@@ -57,6 +57,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
         MilestoneStatus status; // PENDING → APPROVED → CLAIMED
         uint256 createdAt; // When submitted
         uint256 approvedAt; // When auditor approved
+        string encryptedEvidenceHash; // Base64-encoded JSON with nonce + ciphertext (empty if no evidence)
     }
 
     // ============ State ============
@@ -240,7 +241,10 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
         address finalAuditor = auditor == address(0) ? msg.sender : auditor;
         require(finalAuditor != employee, "auditor cannot be employee");
-        require(bytes(auditorPublicKey).length > 0, "auditor public key required");
+        require(
+            bytes(auditorPublicKey).length > 0,
+            "auditor public key required"
+        );
 
         uint256 totalAmount = streamAmount + escrowAmount;
 
@@ -414,7 +418,8 @@ contract Paystream is ReentrancyGuard, AccessControl {
             amount: amount,
             status: MilestoneStatus.PENDING,
             createdAt: block.timestamp,
-            approvedAt: 0
+            approvedAt: 0,
+            encryptedEvidenceHash: "" // No evidence for basic milestone submission
         });
 
         paymentMilestones[paymentId].push(milestoneId);
@@ -442,7 +447,10 @@ contract Paystream is ReentrancyGuard, AccessControl {
         require(msg.sender == p.employee, "not employee");
         require(amount > 0, "amount must be > 0");
         require(amount <= p.escrowed, "exceeds available escrow");
-        require(bytes(encryptedEvidenceHash).length > 0, "encrypted evidence required");
+        require(
+            bytes(encryptedEvidenceHash).length > 0,
+            "encrypted evidence required"
+        );
 
         uint256 milestoneId = _nextMilestoneId++;
         milestones[milestoneId] = Milestone({
@@ -451,7 +459,8 @@ contract Paystream is ReentrancyGuard, AccessControl {
             amount: amount,
             status: MilestoneStatus.PENDING,
             createdAt: block.timestamp,
-            approvedAt: 0
+            approvedAt: 0,
+            encryptedEvidenceHash: encryptedEvidenceHash
         });
 
         paymentMilestones[paymentId].push(milestoneId);

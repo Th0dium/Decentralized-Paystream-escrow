@@ -21,8 +21,9 @@ export interface EnrichedMilestone {
   status: MilestoneStatus
   createdAt: number
   approvedAt: number
-  tokenSymbol: string 
-  tokenDecimals: number 
+  tokenSymbol: string
+  tokenDecimals: number
+  encryptedEvidenceHash: string // Empty string if no evidence
 }
 
 interface UseMyMilestonesReturn {
@@ -160,6 +161,7 @@ export function useMyMilestones(userAddress: Address | null, role: 'employee' | 
           approvedAt: Number(m.approvedAt),
           tokenSymbol: tokenInfo?.symbol || 'UNKNOWN',
           tokenDecimals: tokenInfo?.decimals || 18,
+          encryptedEvidenceHash: m.encryptedEvidenceHash || '',
         };
       });
 
