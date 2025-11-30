@@ -6,8 +6,9 @@ import { useAuth } from "@/lib/hooks";
 import { useMyPayments, EnrichedPayment } from "@/lib/hooks/useMyPayments";
 import { formatUnits } from "viem";
 import { withdrawPayment } from "@/lib/contract-interaction"; // Import withdrawPayment correctly
-import { Button } from "@/components/Button"; 
+import { Button } from "@/components/Button";
 import PaymentDetailsModal from "@/components/PaymentDetailsModal";
+import UploadEvidenceModal from "@/components/UploadEvidenceModal";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -15,10 +16,14 @@ export default function EmployeeStreamsContent() {
   const { walletAddress, isEmployee } = useAuth();
   const { asEmployee: streams, isLoading: loading, error, refetch } = useMyPayments(walletAddress as any);
   const [currentPage, setCurrentPage] = useState(1);
-  
+
   // Modal State
   const [selectedPayment, setSelectedPayment] = useState<EnrichedPayment | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Upload Evidence Modal State
+  const [uploadModalPayment, setUploadModalPayment] = useState<EnrichedPayment | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Client-side pagination
   const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -48,6 +53,30 @@ export default function EmployeeStreamsContent() {
 
   const handleRefresh = async () => {
     await refetch();
+  };
+
+  const handleUploadEvidence = async (file: File, milestoneAmount: string) => {
+    setIsUploading(true);
+    try {
+      console.log("📤 Uploading evidence:", {
+        file: file.name,
+        size: file.size,
+        milestoneAmount,
+        paymentId: uploadModalPayment?.paymentId,
+      });
+
+      // TODO: Step 1 - Upload file to IPFS
+      // TODO: Step 2 - Get IPFS hash
+      // TODO: Step 3 - Encrypt hash with auditor's public key
+      // TODO: Step 4 - Submit milestone with encrypted hash on-chain
+
+      alert("Upload functionality will be implemented next!");
+    } catch (error) {
+      console.error("Upload failed:", error);
+      alert("Upload failed: " + (error instanceof Error ? error.message : "Unknown error"));
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   if (loading) {
@@ -104,7 +133,14 @@ export default function EmployeeStreamsContent() {
                 <Card className="hover:bg-slate-800/50 transition-colors border-l-4 border-l-blue-500">
                     <div className="flex justify-between items-center mb-2">
                         <div>
-                            <h3 className="text-lg font-semibold text-slate-100">{stream.name}</h3>
+                            <div className="flex items-center gap-2">
+                                <h3 className="text-lg font-semibold text-slate-100">{stream.name}</h3>
+                                {stream.escrowAmount > 0n && (
+                                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-900/30 text-purple-300 border border-purple-700/50">
+                                        Escrow
+                                    </span>
+                                )}
+                            </div>
                             <span className="text-xs text-slate-500">#{stream.paymentId}</span>
                         </div>
                         <span
@@ -130,12 +166,28 @@ export default function EmployeeStreamsContent() {
                     </div>
 
                     {/* Progress Bar */}
-                    <div className="w-full bg-slate-700 rounded-full h-1.5">
+                    <div className="w-full bg-slate-700 rounded-full h-1.5 mb-3">
                         <div
                             className="bg-blue-500 h-1.5 rounded-full"
                             style={{ width: `${stream.progress}%` }}
                         />
                     </div>
+
+                    {/* Upload Evidence Button - Only show for payments with escrow */}
+                    {stream.escrowAmount > 0n && (
+                        <div className="flex justify-end pt-2 border-t border-slate-700">
+                            <Button
+                                variant="secondary"
+                                className="text-xs py-1.5 px-4 h-auto"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setUploadModalPayment(stream);
+                                }}
+                            >
+                                📎 Upload Evidence
+                            </Button>
+                        </div>
+                    )}
                 </Card>
               </div>
             ))}
@@ -172,6 +224,14 @@ export default function EmployeeStreamsContent() {
         payment={selectedPayment}
         onAction={handleAction}
         isSubmitting={isSubmitting}
+      />
+
+      <UploadEvidenceModal
+        isOpen={!!uploadModalPayment}
+        closeModal={() => setUploadModalPayment(null)}
+        payment={uploadModalPayment}
+        onUpload={handleUploadEvidence}
+        isUploading={isUploading}
       />
     </div>
   );
