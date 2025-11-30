@@ -28,6 +28,7 @@ export default function CompanyCreatePaymentContent() {
   const [isEscrowEnabled, setIsEscrowEnabled] = useState(false);
   const [escrowAmount, setEscrowAmount] = useState("");
   const [auditorAddress, setAuditorAddress] = useState("");
+  const [isEncryptionEnabled, setIsEncryptionEnabled] = useState(true);
 
   // Transaction State
   const [isLoading, setIsLoading] = useState(false);
@@ -104,19 +105,26 @@ export default function CompanyCreatePaymentContent() {
       const finalDuration = duration > 0 ? duration : 1;
       const finalAuditor = auditorAddress || walletAddress; // If blank, assign self
 
-      // Generate auditor keypair (public key will be stored on-chain, secret key stored locally)
-      console.log("🔐 Generating auditor keypair for encryption...");
-      const { publicKey: auditorPublicKey, secretKey: auditorSecretKey } = generateKeypair();
-      console.log(`✅ Public Key (for contract): ${auditorPublicKey.substring(0, 20)}...`);
-      
-      // We don't log the secret key here anymore since we display it in the UI
+      let finalPublicKey = "";
+      let tempSecretKey = "";
+
+      if (isEncryptionEnabled && isEscrowEnabled) {
+          // Generate auditor keypair (public key will be stored on-chain, secret key stored locally)
+          console.log("🔐 Generating auditor keypair for encryption...");
+          const { publicKey, secretKey } = generateKeypair();
+          finalPublicKey = publicKey;
+          tempSecretKey = secretKey;
+          console.log(`✅ Public Key (for contract): ${publicKey.substring(0, 20)}...`);
+      } else {
+          console.log("🔓 Encryption disabled or no escrow. Using plain IPFS upload.");
+      }
 
       await createPayment(
         contractAddress as any,
         paymentName,
         recipientAddress as any,
         finalAuditor as any,
-        auditorPublicKey,
+        finalPublicKey,
         selectedToken.address as any,
         sAmount,
         eAmount,
@@ -124,8 +132,14 @@ export default function CompanyCreatePaymentContent() {
         selectedToken.decimals
       );
 
-      // Success! Don't redirect yet. Show key.
-      setCreatedAuditorSecretKey(auditorSecretKey);
+      // Success logic
+      if (tempSecretKey) {
+        // If encrypted, don't redirect yet. Show key.
+        setCreatedAuditorSecretKey(tempSecretKey);
+      } else {
+        // If not encrypted, just go back to list
+        setActiveDashboardView('company-streams');
+      }
       
     } catch (err) {
       setError(err instanceof Error ? err.message : "Creation failed");
@@ -310,7 +324,31 @@ export default function CompanyCreatePaymentContent() {
                   onChange={(e) => setEscrowAmount(e.target.value)}
                 />
               </div>
-              <div className="bg-slate-900/50 p-3 rounded text-sm text-slate-400 mt-8">
+
+              {/* Encryption Toggle */}
+              <div className="bg-slate-900/30 p-3 rounded border border-slate-700/50">
+                <div className="flex items-start gap-3">
+                    <input
+                        type="checkbox"
+                        id="enableEncryption"
+                        className="mt-1 w-4 h-4 rounded border-slate-600 text-purple-600 focus:ring-purple-500 bg-slate-800"
+                        checked={isEncryptionEnabled}
+                        disabled={!isEscrowEnabled}
+                        onChange={(e) => setIsEncryptionEnabled(e.target.checked)}
+                    />
+                    <div>
+                        <label htmlFor="enableEncryption" className={`text-sm font-medium cursor-pointer ${!isEscrowEnabled ? 'text-slate-500' : 'text-slate-200'}`}>
+                            🔒 Encrypt Evidence
+                        </label>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                            If enabled, evidence files are encrypted before upload. Only the auditor can view them.
+                            If disabled, files are public on IPFS.
+                        </p>
+                    </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-900/50 p-3 rounded text-sm text-slate-400 mt-4">
                 <label htmlFor="auditor-address" className="block text-slate-300 text-sm font-bold mb-2">
                   Auditor Address
                 </label>

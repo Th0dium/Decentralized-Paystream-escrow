@@ -7,9 +7,6 @@
  * - Private key: Secret, used to decrypt (only auditor has this)
  */
 
-/**
- * Type definitions for encryption
- */
 export interface EncryptedData {
   nonce: string; // Base64 encoded
   ciphertext: string; // Base64 encoded
@@ -136,7 +133,6 @@ export function serializeEncryptedData(encryptedData: EncryptedData): string {
 export function deserializeEncryptedData(jsonString: string): EncryptedData {
   try {
     const data = JSON.parse(jsonString);
-    // Check for required fields (support old format if needed, but prefer new)
     if (!data.nonce || !data.ciphertext) {
       throw new Error('Invalid encrypted data format: missing nonce or ciphertext');
     }
@@ -144,7 +140,6 @@ export function deserializeEncryptedData(jsonString: string): EncryptedData {
        throw new Error('Invalid encrypted data format: missing public key');
     }
     // Migration helper: if old 'publicKey' exists but no 'ephemeralPublicKey', map it
-    // Note: This won't actually fix old broken data, but prevents crash
     if (!data.ephemeralPublicKey && data.publicKey) {
         data.ephemeralPublicKey = data.publicKey;
     }

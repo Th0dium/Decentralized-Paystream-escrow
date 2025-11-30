@@ -99,6 +99,12 @@ export default function MilestoneEvidenceModal({
   const ipfsUrl = decryptedIPFSHash ? getIPFSUrl(decryptedIPFSHash) : null;
   const isPending = milestone.status === MilestoneStatus.PENDING;
 
+  // Detect if evidence is encrypted (JSON format) or plain text (IPFS Hash)
+  const isEncrypted = milestone.encryptedEvidenceHash.trim().startsWith("{");
+  // If not encrypted, the "encryptedEvidenceHash" field actually holds the plain IPFS hash
+  const plainIpfsHash = !isEncrypted ? milestone.encryptedEvidenceHash : null;
+  const plainIpfsUrl = plainIpfsHash ? getIPFSUrl(plainIpfsHash) : null;
+
   return (
     <Transition appear show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-50" onClose={handleClose}>
@@ -174,83 +180,118 @@ export default function MilestoneEvidenceModal({
                   {/* Evidence Section */}
                   {milestone.encryptedEvidenceHash ? (
                     <div className="space-y-4">
-                      <div className="bg-purple-900/20 border border-purple-700/50 rounded-lg p-4">
-                        <h4 className="text-sm font-medium text-slate-300 mb-3">
-                          🔐 Encrypted Evidence
-                        </h4>
-                        <p className="text-xs text-slate-400 mb-3">
-                          The employee submitted encrypted evidence. To view it, please enter the Auditor Private Key that was shared with you by the Company (the payment creator).
-                        </p>
+                      {isEncrypted ? (
+                        /* --- ENCRYPTED VIEW --- */
+                        <div className="bg-purple-900/20 border border-purple-700/50 rounded-lg p-4">
+                            <h4 className="text-sm font-medium text-slate-300 mb-3">
+                            🔐 Encrypted Evidence
+                            </h4>
+                            <p className="text-xs text-slate-400 mb-3">
+                            The employee submitted encrypted evidence. To view it, please enter the Auditor Private Key that was shared with you by the Company (the payment creator).
+                            </p>
 
-                        {!decryptedIPFSHash && (
-                          <div className="space-y-3">
-                            <div>
-                              <label className="block text-xs font-medium text-slate-300 mb-2">
-                                Auditor Private Key (Secret)
-                              </label>
-                              <textarea
-                                value={auditorSecretKey}
-                                onChange={(e) => {
-                                  setAuditorSecretKey(e.target.value);
-                                  setDecryptError(null);
-                                }}
-                                placeholder="Paste the Auditor Private Key here..."
-                                className="w-full h-24 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-xs text-slate-100 font-mono focus:outline-none focus:ring-2 focus:ring-purple-500"
-                              />
+                            {!decryptedIPFSHash && (
+                            <div className="space-y-3">
+                                <div>
+                                <label className="block text-xs font-medium text-slate-300 mb-2">
+                                    Auditor Private Key (Secret)
+                                </label>
+                                <textarea
+                                    value={auditorSecretKey}
+                                    onChange={(e) => {
+                                    setAuditorSecretKey(e.target.value);
+                                    setDecryptError(null);
+                                    }}
+                                    placeholder="Paste the Auditor Private Key here..."
+                                    className="w-full h-24 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-xs text-slate-100 font-mono focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                />
+                                </div>
+
+                                {decryptError && (
+                                <div className="text-xs text-red-400 bg-red-900/20 border border-red-700/50 rounded p-2">
+                                    ❌ {decryptError}
+                                </div>
+                                )}
+
+                                <Button
+                                onClick={handleDecrypt}
+                                variant="primary"
+                                disabled={!auditorSecretKey || isDecrypting}
+                                loading={isDecrypting}
+                                className="w-full text-sm"
+                                >
+                                {isDecrypting ? "Decrypting..." : "🔓 Decrypt Evidence"}
+                                </Button>
                             </div>
-
-                            {decryptError && (
-                              <div className="text-xs text-red-400 bg-red-900/20 border border-red-700/50 rounded p-2">
-                                ❌ {decryptError}
-                              </div>
                             )}
 
-                            <Button
-                              onClick={handleDecrypt}
-                              variant="primary"
-                              disabled={!auditorSecretKey || isDecrypting}
-                              loading={isDecrypting}
-                              className="w-full text-sm"
-                            >
-                              {isDecrypting ? "Decrypting..." : "🔓 Decrypt Evidence"}
-                            </Button>
-                          </div>
-                        )}
+                            {decryptedIPFSHash && (
+                            <div className="space-y-3">
+                                <div className="bg-slate-900 border border-slate-600 rounded-lg p-3">
+                                <div className="text-xs text-slate-400 mb-2">
+                                    Decrypted IPFS Hash
+                                </div>
+                                <div className="text-sm font-mono text-slate-300 break-all">
+                                    {decryptedIPFSHash}
+                                </div>
+                                </div>
 
-                        {decryptedIPFSHash && (
-                          <div className="space-y-3">
-                            <div className="bg-slate-900 border border-slate-600 rounded-lg p-3">
-                              <div className="text-xs text-slate-400 mb-2">
-                                IPFS Hash
-                              </div>
-                              <div className="text-sm font-mono text-slate-300 break-all">
-                                {decryptedIPFSHash}
-                              </div>
+                                <div className="flex gap-2">
+                                <a
+                                    href={ipfsUrl || "#"}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex-1 inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-colors bg-slate-700 text-slate-200 hover:bg-slate-600"
+                                >
+                                    📎 View on IPFS
+                                </a>
+                                <Button
+                                    onClick={() => {
+                                    setDecryptedIPFSHash(null);
+                                    setAuditorSecretKey("");
+                                    }}
+                                    variant="secondary"
+                                    className="flex-1 text-sm"
+                                >
+                                    🔐 Hide
+                                </Button>
+                                </div>
                             </div>
+                            )}
+                        </div>
+                      ) : (
+                        /* --- PLAIN / PUBLIC VIEW --- */
+                        <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-4">
+                            <h4 className="text-sm font-medium text-slate-300 mb-3">
+                            🌐 Public Evidence
+                            </h4>
+                            <p className="text-xs text-slate-400 mb-3">
+                            This evidence was submitted without encryption. It is publicly accessible.
+                            </p>
 
-                            <div className="flex gap-2">
-                              <a
-                                href={ipfsUrl || "#"}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex-1 inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-colors bg-slate-700 text-slate-200 hover:bg-slate-600"
-                              >
-                                📎 View on IPFS
-                              </a>
-                              <Button
-                                onClick={() => {
-                                  setDecryptedIPFSHash(null);
-                                  setAuditorSecretKey("");
-                                }}
-                                variant="secondary"
-                                className="flex-1 text-sm"
-                              >
-                                🔐 Hide
-                              </Button>
+                            <div className="space-y-3">
+                                <div className="bg-slate-900 border border-slate-600 rounded-lg p-3">
+                                <div className="text-xs text-slate-400 mb-2">
+                                    IPFS Hash
+                                </div>
+                                <div className="text-sm font-mono text-slate-300 break-all">
+                                    {plainIpfsHash}
+                                </div>
+                                </div>
+
+                                <div className="flex gap-2">
+                                <a
+                                    href={plainIpfsUrl || "#"}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="w-full inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-colors bg-blue-700 text-slate-100 hover:bg-blue-600"
+                                >
+                                    📎 View on IPFS
+                                </a>
+                                </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="bg-slate-900/50 border border-dashed border-slate-600 rounded-lg p-4 text-center">
@@ -320,4 +361,3 @@ export default function MilestoneEvidenceModal({
     </Transition>
   );
 }
-

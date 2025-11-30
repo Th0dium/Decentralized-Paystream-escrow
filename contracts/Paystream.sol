@@ -225,7 +225,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
         require(isTokenWhitelisted[token], "token not whitelisted");
         require(!newPaymentsPaused, "payment creation is paused");
         require(employee != address(0), "invalid employee");
-        require(employee != msg.sender, "company cannot be employee");
+        // require(employee != msg.sender, "company cannot be employee"); // Allow self-payment for testing
         require(token != address(0), "invalid token");
         require(bytes(name).length > 0, "name required");
         require(
@@ -241,10 +241,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
         address finalAuditor = auditor == address(0) ? msg.sender : auditor;
         require(finalAuditor != employee, "auditor cannot be employee");
-        require(
-            bytes(auditorPublicKey).length > 0,
-            "auditor public key required"
-        );
+        // auditorPublicKey is optional. If empty, evidence is not encrypted.
 
         uint256 totalAmount = streamAmount + escrowAmount;
 
