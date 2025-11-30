@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type DashboardView = 'overview' | 'employee' | 'company' | 'auditor' | 'employee-streams' | 'employee-withdraw' | 'employee-milestones' | 'company-create-payment' | 'company-streams' | 'auditor-milestones' | 'admin-whitelist-token' | null;
+export type DashboardView = 'overview' | 'employee' | 'company' | 'auditor' | 'employee-streams' | 'employee-withdraw' | 'employee-milestones' | 'company-create-payment' | 'company-streams' | 'auditor-payments' | 'auditor-milestones' | 'admin-whitelist-token' | null;
 
 interface DashboardStore {
   activeDashboardView: DashboardView;

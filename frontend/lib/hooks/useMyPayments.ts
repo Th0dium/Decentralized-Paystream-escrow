@@ -61,8 +61,9 @@ export function useMyPayments(userAddress: Address | null): UseMyPaymentsReturn 
   ): Promise<number[]> => {
     if (!publicClient) return [];
     try {
+      // Use contract functions for all roles
       let functionName: 'getEmployeePayments' | 'getCompanyPayments' | 'getAuditorPayments';
-      
+
       switch (role) {
         case 'employee':
           functionName = 'getEmployeePayments';
