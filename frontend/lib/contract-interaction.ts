@@ -43,7 +43,8 @@ export const PAYSTREAM_ABI = [
           { internalType: "string", name: "name", type: "string" },
           { internalType: "address", name: "company", type: "address" },
           { internalType: "address", name: "employee", type: "address" },
-          { internalType: "address", name: "token", type: "address" }, 
+          { internalType: "address", name: "auditor", type: "address" },
+          { internalType: "address", name: "token", type: "address" },
           { internalType: "uint256", name: "streamAmount", type: "uint256" },
           { internalType: "uint256", name: "escrowAmount", type: "uint256" },
           { internalType: "uint64", name: "startTime", type: "uint64" },
@@ -71,6 +72,7 @@ export const PAYSTREAM_ABI = [
       { internalType: "string", name: "name", type: "string" },
       { internalType: "address", name: "company", type: "address" },
       { internalType: "address", name: "employee", type: "address" },
+      { internalType: "address", name: "auditor", type: "address" },
       { internalType: "address", name: "token", type: "address" },
       { internalType: "uint256", name: "streamAmount", type: "uint256" },
       { internalType: "uint256", name: "escrowAmount", type: "uint256" },
@@ -148,6 +150,7 @@ export const PAYSTREAM_ABI = [
     inputs: [
       { internalType: "string", name: "name", type: "string" },
       { internalType: "address", name: "employee", type: "address" },
+      { internalType: "address", name: "auditor", type: "address" },
       { internalType: "address", name: "token", type: "address" },
       { internalType: "uint256", name: "streamAmount", type: "uint256" },
       { internalType: "uint256", name: "escrowAmount", type: "uint256" },
@@ -268,12 +271,12 @@ const ERC20_ABI = [
 export async function getTokenSymbol(
   tokenAddress: Address,
 ): Promise<string> {
-    const symbol = await readContract(config, {
-        address: tokenAddress,
-        abi: ERC20_ABI,
-        functionName: 'symbol',
-    });
-    return symbol as string;
+  const symbol = await readContract(config, {
+    address: tokenAddress,
+    abi: ERC20_ABI,
+    functionName: 'symbol',
+  });
+  return symbol as string;
 }
 
 /**
@@ -282,12 +285,12 @@ export async function getTokenSymbol(
 export async function getTokenName(
   tokenAddress: Address,
 ): Promise<string> {
-    const name = await readContract(config, {
-        address: tokenAddress,
-        abi: ERC20_ABI,
-        functionName: 'name',
-    });
-    return name as string;
+  const name = await readContract(config, {
+    address: tokenAddress,
+    abi: ERC20_ABI,
+    functionName: 'name',
+  });
+  return name as string;
 }
 
 /**
@@ -426,6 +429,7 @@ export async function createPayment(
   contractAddress: Address,
   name: string,
   employeeAddress: Address,
+  auditorAddress: Address,
   tokenAddress: Address,
   streamAmount: string,
   escrowAmount: string,
@@ -446,6 +450,7 @@ export async function createPayment(
   console.log(`📍 Contract: ${contractAddress}`);
   console.log(`📝 Name: ${name}`);
   console.log(`👤 Employee: ${employeeAddress}`);
+  console.log(`🕵️ Auditor: ${auditorAddress || "Company (Self)"}`);
   console.log(`💰 Stream Amount: ${streamAmount} tokens (${streamAmountInWei} wei)`);
   console.log(`🎯 Escrow Amount: ${escrowAmount} tokens (${escrowAmountInWei} wei)`);
   console.log(`📅 Duration: ${durationDays} days`);
@@ -454,18 +459,19 @@ export async function createPayment(
   try {
     console.log("\n📤 Submitting createPayment transaction...");
     const hash = await writeContract(config, {
-        address: contractAddress,
-        abi: PAYSTREAM_ABI,
-        functionName: "createPayment",
-        args: [
-            name,
-            employeeAddress,
-            tokenAddress,
-            streamAmountInWei,
-            escrowAmountInWei,
-            BigInt(startTime),
-            BigInt(stopTime),
-        ],
+      address: contractAddress,
+      abi: PAYSTREAM_ABI,
+      functionName: "createPayment",
+      args: [
+        name,
+        employeeAddress,
+        auditorAddress,
+        tokenAddress,
+        streamAmountInWei,
+        escrowAmountInWei,
+        BigInt(startTime),
+        BigInt(stopTime),
+      ],
     });
 
     console.log(`✅ Transaction sent: ${hash}`);
@@ -512,13 +518,13 @@ export async function getTokenBalance(
   tokenAddress: Address,
   accountAddress: Address
 ): Promise<string> {
-    const balance = await readContract(config, {
-        address: tokenAddress,
-        abi: ERC20_ABI,
-        functionName: 'balanceOf',
-        args: [accountAddress]
-    });
-    return balance.toString();
+  const balance = await readContract(config, {
+    address: tokenAddress,
+    abi: ERC20_ABI,
+    functionName: 'balanceOf',
+    args: [accountAddress]
+  });
+  return balance.toString();
 }
 
 /**
@@ -527,12 +533,12 @@ export async function getTokenBalance(
 export async function getTokenDecimals(
   tokenAddress: Address,
 ): Promise<number> {
-    const decimals = await readContract(config, {
-        address: tokenAddress,
-        abi: ERC20_ABI,
-        functionName: 'decimals',
-    });
-    return decimals;
+  const decimals = await readContract(config, {
+    address: tokenAddress,
+    abi: ERC20_ABI,
+    functionName: 'decimals',
+  });
+  return decimals;
 }
 
 /**
@@ -542,18 +548,18 @@ export async function checkTokenWhitelisted(
   contractAddress: Address,
   tokenAddress: Address
 ): Promise<boolean> {
-    try {
-        const isWhitelisted = await readContract(config, {
-            address: contractAddress,
-            abi: PAYSTREAM_ABI,
-            functionName: 'isTokenWhitelisted',
-            args: [tokenAddress]
-        });
-        return isWhitelisted as boolean;
-    } catch (error) {
-        console.error("Error checking token whitelist:", error);
-        return false;
-    }
+  try {
+    const isWhitelisted = await readContract(config, {
+      address: contractAddress,
+      abi: PAYSTREAM_ABI,
+      functionName: 'isTokenWhitelisted',
+      args: [tokenAddress]
+    });
+    return isWhitelisted as boolean;
+  } catch (error) {
+    console.error("Error checking token whitelist:", error);
+    return false;
+  }
 }
 
 // ============ PAYMENT MANAGEMENT FUNCTIONS ============
@@ -687,7 +693,7 @@ export async function submitMilestone(
   contractAddress: Address,
   paymentId: string,
   amount: string,
-  descriptionHash: string,
+  auditorAddress: Address,
   tokenDecimals: number = 18
 ): Promise<{ transactionHash: string }> {
   const amountInWei = parseUnits(amount, tokenDecimals);
@@ -695,14 +701,14 @@ export async function submitMilestone(
   console.log("\n📤 === SUBMIT MILESTONE ===");
   console.log(`📍 Payment ID: ${paymentId}`);
   console.log(`💰 Amount: ${amount} (${amountInWei} wei)`);
-  console.log(`📄 Description Hash: ${descriptionHash}`);
+  console.log(`️ Auditor: ${auditorAddress}`);
 
   try {
     const hash = await writeContract(config, {
       address: contractAddress,
       abi: PAYSTREAM_ABI,
       functionName: "submitMilestone",
-      args: [BigInt(paymentId), amountInWei],
+      args: [BigInt(paymentId), amountInWei, auditorAddress],
     });
 
     console.log(`📤 Milestone submission transaction sent: ${hash}`);

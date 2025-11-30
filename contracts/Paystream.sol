@@ -34,6 +34,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
         string name;
         address company;
         address employee;
+        address auditor; // Auditor for the entire payment
         IERC20 token;
         uint256 streamAmount; // Amount for continuous streaming
         uint256 escrowAmount; // Initial escrow amount locked for milestones
@@ -67,12 +68,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
     mapping(address => uint256[]) public employeeMilestones;
     mapping(address => uint256[]) public companyPayments;
     mapping(address => uint256[]) public employeePayments;
-
-    // --- Payment-Specific Roles ---
-    mapping(uint256 => mapping(address => bool)) public isPaymentAuditor;
     mapping(address => uint256[]) public auditorPayments;
-
-    // --- Admin-Controlled State ---
     bool public newPaymentsPaused;
     mapping(address => bool) public isTokenWhitelisted;
 
@@ -84,12 +80,6 @@ contract Paystream is ReentrancyGuard, AccessControl {
     // ============ Events ============
     event NewPaymentCreationPaused(bool status);
     event TokenWhitelistUpdated(address indexed token, bool isWhitelisted);
-
-    event PaymentAuditorAdded(uint256 indexed paymentId, address indexed auditor);
-    event PaymentAuditorRemoved(
-        uint256 indexed paymentId,
-        address indexed auditor
-    );
 
     event PaymentCreated(
         uint256 indexed paymentId,
@@ -202,6 +192,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
      * @notice Create a new payment. The caller must have approved tokens.
      * @param name Name/Title of the payment
      * @param employee Address receiving the payment
+     * @param auditor Address of the auditor for milestones. If address(0), company is the auditor.
      * @param token ERC20 token address
      * @param streamAmount Amount to stream continuously over duration
      * @param escrowAmount Amount to lock in escrow for milestones
@@ -212,6 +203,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
     function createPayment(
         string memory name,
         address employee,
+        address auditor,
         address token,
         uint256 streamAmount,
         uint256 escrowAmount,
@@ -225,7 +217,8 @@ contract Paystream is ReentrancyGuard, AccessControl {
         require(token != address(0), "invalid token");
         require(bytes(name).length > 0, "name required");
         require(
-            streamAmount >= MIN_PAYMENT_AMOUNT || escrowAmount >= MIN_PAYMENT_AMOUNT,
+            streamAmount >= MIN_PAYMENT_AMOUNT ||
+                escrowAmount >= MIN_PAYMENT_AMOUNT,
             "amount too small"
         );
         require(stopTime > startTime, "stop time must be after start time");
@@ -233,6 +226,9 @@ contract Paystream is ReentrancyGuard, AccessControl {
         uint64 duration = stopTime - startTime;
         require(duration >= MIN_PAYMENT_DURATION, "duration too short");
         require(duration <= MAX_PAYMENT_DURATION, "duration too long");
+
+        address finalAuditor = auditor == address(0) ? msg.sender : auditor;
+        require(finalAuditor != employee, "auditor cannot be employee");
 
         uint256 totalAmount = streamAmount + escrowAmount;
 
@@ -247,6 +243,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
             company: msg.sender,
             employee: employee,
             token: erc20,
+            auditor: finalAuditor,
             streamAmount: streamAmount,
             escrowAmount: escrowAmount,
             startTime: startTime,
@@ -262,6 +259,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
         employeePayments[employee].push(paymentId);
         companyPayments[msg.sender].push(paymentId);
+        auditorPayments[finalAuditor].push(paymentId);
 
         emit PaymentCreated(
             paymentId,
@@ -275,33 +273,6 @@ contract Paystream is ReentrancyGuard, AccessControl {
             stopTime
         );
         return paymentId;
-    }
-
-    // ============ Payment-Specific Auditor Management ============
-    function addPaymentAuditor(uint256 paymentId, address auditor) external {
-        Payment storage p = payments[paymentId];
-        require(p.company != address(0), "payment does not exist");
-        require(msg.sender == p.company, "not payment company");
-        require(auditor != address(0), "auditor address cannot be zero");
-        require(auditor != p.employee, "auditor cannot be employee");
-
-        if (!isPaymentAuditor[paymentId][auditor]) {
-            isPaymentAuditor[paymentId][auditor] = true;
-            auditorPayments[auditor].push(paymentId);
-            emit PaymentAuditorAdded(paymentId, auditor);
-        }
-    }
-
-    function removePaymentAuditor(uint256 paymentId, address auditor) external {
-        Payment storage p = payments[paymentId];
-        require(p.company != address(0), "payment does not exist");
-        require(msg.sender == p.company, "not payment company");
-
-        if (isPaymentAuditor[paymentId][auditor]) {
-            isPaymentAuditor[paymentId][auditor] = false;
-            _removeFromArray(auditorPayments[auditor], paymentId);
-            emit PaymentAuditorRemoved(paymentId, auditor);
-        }
     }
 
     // ============ Core Payment Interaction (Withdraw, Pause, etc.) ============
@@ -390,7 +361,9 @@ contract Paystream is ReentrancyGuard, AccessControl {
         uint256 totalAccrued = getTotalEarned(paymentId);
 
         // Refund the unearned stream amount
-        uint256 refundStream = p.streamAmount > totalAccrued ? p.streamAmount - totalAccrued : 0;
+        uint256 refundStream = p.streamAmount > totalAccrued
+            ? p.streamAmount - totalAccrued
+            : 0;
         uint256 refundEscrow = p.escrowed;
 
         if (refundStream > 0) {
@@ -400,7 +373,12 @@ contract Paystream is ReentrancyGuard, AccessControl {
             p.token.safeTransfer(p.company, refundEscrow);
         }
 
-        emit PaymentCancelled(paymentId, msg.sender, refundStream, refundEscrow);
+        emit PaymentCancelled(
+            paymentId,
+            msg.sender,
+            refundStream,
+            refundEscrow
+        );
     }
 
     // ============ Milestone Management ============
@@ -436,8 +414,10 @@ contract Paystream is ReentrancyGuard, AccessControl {
         Milestone storage m = milestones[milestoneId];
         require(m.submitter != address(0), "milestone does not exist");
         require(m.status == MilestoneStatus.PENDING, "milestone not pending");
-        require(isPaymentAuditor[m.paymentId][msg.sender], "not payment auditor");
-        require(msg.sender != m.submitter, "auditor cannot be submitter");
+
+        Payment storage p = payments[m.paymentId];
+        require(msg.sender == p.auditor, "not payment auditor");
+        require(p.auditor != m.submitter, "auditor cannot be submitter");
 
         m.status = MilestoneStatus.APPROVED;
         m.approvedAt = block.timestamp;
@@ -449,8 +429,10 @@ contract Paystream is ReentrancyGuard, AccessControl {
         Milestone storage m = milestones[milestoneId];
         require(m.submitter != address(0), "milestone does not exist");
         require(m.status == MilestoneStatus.PENDING, "milestone not pending");
-        require(isPaymentAuditor[m.paymentId][msg.sender], "not payment auditor");
-        require(msg.sender != m.submitter, "auditor cannot be submitter");
+
+        Payment storage p = payments[m.paymentId];
+        require(msg.sender == p.auditor, "not payment auditor");
+        require(p.auditor != m.submitter, "auditor cannot be submitter");
 
         m.status = MilestoneStatus.REJECTED;
 
@@ -474,27 +456,10 @@ contract Paystream is ReentrancyGuard, AccessControl {
         emit MilestoneClaimed(milestoneId, m.paymentId, m.submitter, m.amount);
     }
 
-    // ============ Internal Helper ============
-    /**
-     * @dev Internal helper to remove a value from a uint256 array.
-     * Swaps the element to delete with the last element, then pops.
-     * Order is NOT preserved.
-     */
-    function _removeFromArray(uint256[] storage array, uint256 value) internal {
-        uint256 length = array.length;
-        for (uint256 i = 0; i < length; i++) {
-            if (array[i] == value) {
-                if (i != length - 1) {
-                    array[i] = array[length - 1];
-                }
-                array.pop();
-                break;
-            }
-        }
-    }
-
     // ============ View Functions ============
-    function getPayment(uint256 paymentId) external view returns (Payment memory) {
+    function getPayment(
+        uint256 paymentId
+    ) external view returns (Payment memory) {
         return payments[paymentId];
     }
 

@@ -17,7 +17,7 @@ export default function CompanyCreatePaymentContent() {
   const [paymentName, setPaymentName] = useState("");
   const [recipientAddress, setRecipientAddress] = useState("");
   const [selectedToken, setSelectedToken] = useState<Token>(WHITELISTED_TOKENS[0]);
-  
+
   // Stream Config
   const [isStreamEnabled, setIsStreamEnabled] = useState(true);
   const [streamAmount, setStreamAmount] = useState("");
@@ -84,7 +84,7 @@ export default function CompanyCreatePaymentContent() {
     try {
       if (!paymentName) throw new Error("Payment name is required");
       if (!isAddress(recipientAddress)) throw new Error("Invalid recipient address");
-      
+
       const total = calculateTotal();
       if (total <= 0) throw new Error("Total amount must be greater than 0");
       if (parseFloat(balance) < total) throw new Error("Insufficient token balance");
@@ -104,12 +104,14 @@ export default function CompanyCreatePaymentContent() {
       // or relying on the fact that if stream is disabled we are likely creating an escrow-only payment?
       // Looking at contract: `require(duration >= MIN_PAYMENT_DURATION)` is always checked.
       // So we must send at least 1 day even for Escrow-only payments.
-      const finalDuration = duration > 0 ? duration : 1; 
+      const finalDuration = duration > 0 ? duration : 1;
+      const finalAuditor = auditorAddress || walletAddress; // If blank, assign self
 
       await createPayment(
         contractAddress as any,
         paymentName,
         recipientAddress as any,
+        finalAuditor as any,
         selectedToken.address as any,
         sAmount,
         eAmount,
@@ -208,7 +210,7 @@ export default function CompanyCreatePaymentContent() {
                 Stream Salary
               </label>
             </div>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm text-slate-400 mb-1">Stream Amount ({selectedToken.symbol})</label>
@@ -249,7 +251,7 @@ export default function CompanyCreatePaymentContent() {
                 Escrow Fund
               </label>
             </div>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm text-slate-400 mb-1">Escrow Amount ({selectedToken.symbol})</label>
@@ -282,7 +284,7 @@ export default function CompanyCreatePaymentContent() {
         {/* Bottom Section: Transaction Summary */}
         <div className="bg-slate-900/50 rounded-xl p-6 border border-slate-700">
           <h3 className="text-lg font-semibold text-slate-100 mb-4">Transaction Summary</h3>
-          
+
           <div className="space-y-2 mb-6 text-sm">
             <div className="flex justify-between text-slate-400">
               <span>Stream Allocation:</span>
