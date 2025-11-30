@@ -109,14 +109,10 @@ export default function CompanyCreatePaymentContent() {
       let tempSecretKey = "";
 
       if (isEncryptionEnabled && isEscrowEnabled) {
-          // Generate auditor keypair (public key will be stored on-chain, secret key stored locally)
-          console.log("🔐 Generating auditor keypair for encryption...");
+          // Generate auditor keypair if encryption is requested
           const { publicKey, secretKey } = generateKeypair();
           finalPublicKey = publicKey;
           tempSecretKey = secretKey;
-          console.log(`✅ Public Key (for contract): ${publicKey.substring(0, 20)}...`);
-      } else {
-          console.log("🔓 Encryption disabled or no escrow. Using plain IPFS upload.");
       }
 
       await createPayment(
@@ -134,10 +130,8 @@ export default function CompanyCreatePaymentContent() {
 
       // Success logic
       if (tempSecretKey) {
-        // If encrypted, don't redirect yet. Show key.
         setCreatedAuditorSecretKey(tempSecretKey);
       } else {
-        // If not encrypted, just go back to list
         setActiveDashboardView('company-streams');
       }
       

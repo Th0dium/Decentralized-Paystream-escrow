@@ -65,42 +65,24 @@ export default function EmployeeStreamsContent() {
         throw new Error("Payment data missing");
       }
 
-      console.log("📤 === EVIDENCE UPLOAD WORKFLOW ===");
-      console.log(`📝 Payment: ${uploadModalPayment.name} (#${uploadModalPayment.paymentId})`);
-      console.log(`💰 Milestone Amount: ${milestoneAmount}`);
-      console.log(`📄 File: ${file.name}`);
-
-      // Step 1: Upload file to IPFS
-      console.log("\n1️⃣ Uploading file to IPFS...");
+      // 1. Upload file to IPFS
       const ipfsHash = await uploadToIPFS(file);
-      console.log(`✅ IPFS Hash: ${ipfsHash}`);
 
-      // Step 2: Check for encryption requirement
-      console.log("\n2️⃣ Checking encryption requirements...");
+      // 2. Prepare payload (Check for encryption)
       const auditorPublicKey = (uploadModalPayment as any).auditorPublicKey;
-      
-      let evidencePayload = ipfsHash; // Default: send plain IPFS hash
+      let evidencePayload = ipfsHash; // Default: plain IPFS hash
 
       if (auditorPublicKey && auditorPublicKey.length > 0) {
-          console.log("🔒 Encryption enabled for this payment.");
-          
           if (!isValidPublicKey(auditorPublicKey)) {
             throw new Error("Invalid auditor public key format");
           }
 
-          // Step 3: Encrypt IPFS hash with auditor's public key
-          console.log("3️⃣ Encrypting IPFS hash with auditor's public key...");
+          // Encrypt IPFS hash with auditor's public key
           const encryptedData = encryptWithPublicKey(ipfsHash, auditorPublicKey);
-          evidencePayload = serializeEncryptedData(encryptedData); // Send JSON payload
-          
-          console.log(`✅ Encrypted successfully`);
-          console.log(`   Ciphertext: ${encryptedData.ciphertext.substring(0, 20)}...`);
-      } else {
-          console.log("🔓 Encryption disabled. Submitting plain IPFS hash.");
+          evidencePayload = serializeEncryptedData(encryptedData);
       }
 
-      // Step 4: Submit milestone with evidence (encrypted or plain) on-chain
-      console.log("\n4️⃣ Submitting milestone with evidence on-chain...");
+      // 3. Submit milestone on-chain
       const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
       if (!contractAddress) throw new Error("Contract address not configured");
 
@@ -111,8 +93,6 @@ export default function EmployeeStreamsContent() {
         evidencePayload,
         uploadModalPayment.tokenDecimals
       );
-
-      console.log("✅ Milestone submitted!");
 
       // Refetch and close modal
       await refetch();
