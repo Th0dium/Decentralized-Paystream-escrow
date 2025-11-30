@@ -75,37 +75,32 @@ export default function EmployeeStreamsContent() {
       const ipfsHash = await uploadToIPFS(file);
       console.log(`✅ IPFS Hash: ${ipfsHash}`);
 
-      // Step 2: Get auditor's public key from payment data
-      console.log("\n2️⃣ Getting auditor's public key from payment data...");
-      // Fetch fresh payment data to ensure we have the auditorPublicKey field
-      // Note: The auditorPublicKey is stored in the Payment struct on contract
-      // For now we use uploadModalPayment which should have been enriched from contract
-
-      // TODO: Need to fetch payment again to get auditorPublicKey from contract
-      // For this MVP, we'll need to make sure EnrichedPayment includes auditorPublicKey
+      // Step 2: Check for encryption requirement
+      console.log("\n2️⃣ Checking encryption requirements...");
       const auditorPublicKey = (uploadModalPayment as any).auditorPublicKey;
+      
+      let evidencePayload = ipfsHash; // Default: send plain IPFS hash
 
-      if (!auditorPublicKey) {
-        throw new Error(
-          "Auditor's public key not found in payment data. Contract may not have been updated."
-        );
+      if (auditorPublicKey && auditorPublicKey.length > 0) {
+          console.log("🔒 Encryption enabled for this payment.");
+          
+          if (!isValidPublicKey(auditorPublicKey)) {
+            throw new Error("Invalid auditor public key format");
+          }
+
+          // Step 3: Encrypt IPFS hash with auditor's public key
+          console.log("3️⃣ Encrypting IPFS hash with auditor's public key...");
+          const encryptedData = encryptWithPublicKey(ipfsHash, auditorPublicKey);
+          evidencePayload = serializeEncryptedData(encryptedData); // Send JSON payload
+          
+          console.log(`✅ Encrypted successfully`);
+          console.log(`   Ciphertext: ${encryptedData.ciphertext.substring(0, 20)}...`);
+      } else {
+          console.log("🔓 Encryption disabled. Submitting plain IPFS hash.");
       }
 
-      if (!isValidPublicKey(auditorPublicKey)) {
-        throw new Error("Invalid auditor public key format");
-      }
-      console.log("✅ Public key validated");
-
-      // Step 3: Encrypt IPFS hash with auditor's public key
-      console.log("\n3️⃣ Encrypting IPFS hash with auditor's public key...");
-      const encryptedData = encryptWithPublicKey(ipfsHash, auditorPublicKey);
-      const encryptedDataJson = serializeEncryptedData(encryptedData);
-      console.log(`✅ Encrypted successfully`);
-      console.log(`   Nonce: ${encryptedData.nonce.substring(0, 20)}...`);
-      console.log(`   Ciphertext: ${encryptedData.ciphertext.substring(0, 20)}...`);
-
-      // Step 4: Submit milestone with encrypted evidence on-chain
-      console.log("\n4️⃣ Submitting milestone with encrypted evidence on-chain...");
+      // Step 4: Submit milestone with evidence (encrypted or plain) on-chain
+      console.log("\n4️⃣ Submitting milestone with evidence on-chain...");
       const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
       if (!contractAddress) throw new Error("Contract address not configured");
 
@@ -113,21 +108,22 @@ export default function EmployeeStreamsContent() {
         contractAddress as any,
         uploadModalPayment.paymentId.toString(),
         milestoneAmount,
-        encryptedDataJson,
+        evidencePayload,
         uploadModalPayment.tokenDecimals
       );
 
-      console.log("✅ Milestone submitted with encrypted evidence!");
-      console.log(`\n📋 Summary:`);
-      console.log(`   - IPFS Hash: ${ipfsHash}`);
-      console.log(`   - Encrypted: Yes (with auditor public key)`);
-      console.log(`   - On-chain: ✅ Submitted`);
+      console.log("✅ Milestone submitted!");
 
       // Refetch and close modal
       await refetch();
       setUploadModalPayment(null);
 
-      alert("✅ Evidence uploaded successfully! The Auditor can now decrypt it using the Private Key provided by the Company.");
+      if (auditorPublicKey && auditorPublicKey.length > 0) {
+        alert("✅ Evidence uploaded successfully! The Auditor can now decrypt it using the Private Key provided by the Company.");
+      } else {
+        alert("✅ Evidence uploaded successfully! The file is publicly accessible via IPFS.");
+      }
+
     } catch (error) {
       console.error("❌ Upload failed:", error);
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
@@ -202,7 +198,7 @@ export default function EmployeeStreamsContent() {
                             <span className="text-xs text-slate-500">#{stream.paymentId}</span>
                         </div>
                         <span
-                            className={`px-3 py-1 rounded-full text-xs font-medium ${
+                            className={`px-3 py-1 rounded-full text-xs font-medium ${ 
                             stream.cancelled
                                 ? "bg-red-900/30 text-red-300"
                                 : stream.paused

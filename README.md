@@ -1,154 +1,102 @@
-# Paystream
+# Decentralized Paystream & Escrow Protocol
 
-A decentralized payment streaming and milestone-based escrow system built on Solidity.
+A comprehensive DeFi payment solution that hybridizes **Real-time Salary Streaming** with **Milestone-based Escrow**. This protocol allows organizations to manage payroll and project-based compensation in a trustless, transparent, and efficient manner on the Ethereum blockchain.
 
-## Overview
+## 🌟 Key Features
 
-Paystream is a unified contract that handles two distinct payment protocols:
+### 1. Hybrid Payment Architecture
+Unlike traditional streaming protocols that only handle linear flows, Paystream combines two models in a single contract interaction:
+*   **Continuous Streaming:** Pay employees second-by-second for their time (e.g., Base Salary). Funds are unlocked linearly over the set duration.
+*   **Milestone Escrow:** Lock funds that are only released upon completion of specific deliverables (e.g., Performance Bonuses, Project Deliverables).
 
-### 1. Payment Protocol (Time-Based Streaming)
-- Companies can create payment streams for employees that unlock tokens over a specified duration.
-- Employees can withdraw their accrued funds at any time.
-- Companies retain control to pause, resume, or cancel streams.
+### 2. Role-Based Ecosystem
+The platform provides distinct dashboards and capabilities for three key roles:
 
-### 2. Escrow Protocol (Milestone-Based Payments)
-- Companies can create milestone-based escrows for employees.
-- Each escrow must be approved by a designated auditor before the employee can claim the funds.
-- Escrows can be standalone or linked to a payment stream.
+#### 🏢 Company (Payer)
+*   **Create Unified Payments:** Set up a payment with both a stream amount and an escrow amount in one transaction.
+*   **Payment Control:** Ability to **Pause** (stop streaming temporarily) and **Resume** payments.
+*   **Cancellation & Refunds:** Cancel streams at any time. Unvested stream funds and locked escrow funds are automatically refunded to the Company, while the Employee keeps what they have already earned.
+*   **Auditor Assignment:** Designate a specific Auditor (or self-assign) to oversee milestone approvals.
 
-This dual-protocol approach allows for flexible compensation models, from simple salary streams to complex project-based payments.
+#### 👷 Employee (Payee)
+*   **Real-time Withdrawals:** Claim vested streaming funds ("salary") at any time.
+*   **Milestone Submission:** Request funds from the Escrow pool by creating Milestones.
+*   **Evidence Upload:** Upload proof of work (files, documents) to IPFS directly from the dashboard.
+*   **Secure Privacy:** Optional encryption ensures only the Auditor can view sensitive evidence.
 
-## User Roles and Application Logic
+#### 🕵️ Auditor (Verifier)
+*   **Third-Party Verification:** A designated neutral party (or the Company itself) responsible for reviewing work.
+*   **Evidence Review:** Decrypt and inspect evidence files submitted by employees.
+*   **Approve/Reject:** Approve milestones to instantly release funds to the Employee, or reject them with feedback.
 
-While the `Paystream.sol` contract defines roles like "company", "employee", and "auditor" within the context of a specific stream or escrow, the broader user roles are managed by an off-chain backend application. This separation allows for more flexible user management and a richer user experience.
+### 3. 🔒 Security & Privacy (Encryption)
+We prioritize user privacy for sensitive work contracts.
+*   **Hybrid Encryption (NaCl):** Utilizes Curve25519 and XSalsa20 to encrypt evidence files client-side before they touch the IPFS network.
+*   **Opt-in Privacy:** Companies can choose to enforce encryption or allow public evidence transparency.
+*   **Secure Key Sharing:** Decryption keys are generated client-side and shared securely off-chain, ensuring not even the protocol developers can access private data.
+*   *Learn more in the [Encryption Mechanism Documentation](./docs/ENCRYPTION_MECHANISM.md).*
 
--   **Initial State**: A new user signing into the application has no specific roles.
--   **Becoming a Company**: Any user who creates a payment stream is designated as a "Company" in the application. This unlocks company-specific features.
--   **Becoming an Employee**: A user becomes an "Employee" when they are designated as the recipient of a payment stream or escrow.
--   **Becoming an Auditor**: A user becomes an "Auditor" when they are assigned to oversee a stream or escrow.
--   **Access Control**: Each role unlocks specific UI components and functionality within the application, tailored to their responsibilities.
+### 4. 💾 Decentralized Storage
+*   **IPFS Integration:** All evidence files are stored on the InterPlanetary File System (via Pinata) ensuring data immutability and decentralization.
+*   **Smart Contract Reference:** Only the IPFS Hash (CID) and encryption metadata are stored on-chain to minimize gas costs.
 
-The on-chain contract remains the source of truth for fund management, while the off-chain application manages user profiles and application state.
+### 5. 🛡️ Admin & Governance
+*   **Token Whitelist:** The protocol Admin manages a whitelist of allowed ERC-20 tokens (e.g., USDC, USDT, DAI) to prevent spam or malicious token usage.
+*   **Emergency Pause:** Admin can pause the creation of *new* payments in case of system maintenance (existing streams continue uninterrupted).
 
-## Project Structure
+## 🛠️ Tech Stack
 
-```
-contracts/
-└── Paystream.sol          # Unified streaming and escrow logic
+*   **Blockchain:** Solidity (Hardhat), OpenZeppelin Contracts.
+*   **Frontend:** Next.js 14 (App Router), TypeScript, Tailwind CSS.
+*   **Web3 Integration:** Wagmi, Viem, RainbowKit.
+*   **Storage:** IPFS (Pinata).
+*   **Cryptography:** TweetNaCl.js.
 
-test/
-└── Paystream.ts           # Tests for the Paystream contract
+## 🚀 Getting Started
 
-scripts/
-└── deploy.ts              # Deployment script
-```
+### Prerequisites
+*   Node.js (v18+)
+*   npm or yarn
+*   Metamask or a Web3 Wallet
 
-## Installation
+### Installation
 
-```bash
-npm install
-```
+1.  **Clone the repository:**
+    ```bash
+    git clone <repo-url>
+    cd Decentralized-Paystream-escrow
+    ```
 
-## Configuration
+2.  **Install dependencies (Root):**
+    ```bash
+    npm install
+    ```
 
-Copy `.env.example` to `.env` and fill in your values:
+3.  **Install dependencies (Frontend):**
+    ```bash
+    cd frontend
+    npm install
+    ```
 
-```bash
-cp .env.example .env
-```
+4.  **Configure Environment:**
+    *   Create a `.env` file in `frontend/` based on `.env.example`.
+    *   Add your `NEXT_PUBLIC_PINATA_JWT` and `NEXT_PUBLIC_GATEWAY_URL`.
 
-Environment variables:
-- `SEPOLIA_RPC_URL`: Sepolia testnet RPC endpoint.
-- `PRIVATE_KEY`: Private key for the deployment account.
-- `ETHERSCAN_API_KEY`: For contract verification on Etherscan.
+5.  **Run Local Node (Optional for Dev):**
+    ```bash
+    npx hardhat node
+    ```
 
-## Usage
+6.  **Deploy Contract:**
+    ```bash
+    npx hardhat run scripts/deploy.ts --network localhost
+    ```
 
-### Compile Contracts
-```bash
-npm run compile
-```
+7.  **Start Frontend:**
+    ```bash
+    cd frontend
+    npm run dev
+    ```
 
-### Run Tests
-```bash
-npm run test
-```
-
-### Deploy Contracts
-```bash
-# Local/Hardhat
-npm run deploy
-
-# Sepolia Testnet
-npm run deploy:sepolia
-```
-
-## Contract Functions
-
-### Admin Functions
-Functions for managing contract-level settings.
-
-- `setNewPaymentsPause(bool status)`: Pause or resume the creation of new payments.
-- `setPlatformFee(uint16 newFeeBps)`: Set the platform fee in basis points.
-- `setFeeRecipient(address newRecipient)`: Set the address that receives platform fees.
-
-### Payment Protocol Functions
-Functions for managing time-based payment streams.
-
-- `createPayment(...)`: Creates a new payment stream.
-- `withdrawPayment(uint256 paymentId)`: Allows an employee to withdraw accrued funds.
-- `pausePayment(uint256 paymentId)`: Pauses a payment stream.
-- `resumePayment(uint256 paymentId)`: Resumes a paused payment stream.
-- `cancelPayment(uint256 paymentId)`: Cancels a payment stream and refunds the remainder to the company.
-- `claimablePayment(uint256 paymentId)`: View function to check the amount available for withdrawal.
-- `addPaymentAuditor(uint256 paymentId, address auditor)`: Adds an auditor to a payment stream.
-- `removePaymentAuditor(uint256 paymentId, address auditor)`: Removes an auditor from a payment stream.
-
-### Escrow Protocol Functions
-Functions for managing milestone-based escrows.
-
-- `createEscrow(...)`: Creates a new escrow.
-- `approveEscrow(uint256 escrowId)`: Allows an auditor to approve an escrow.
-- `rejectEscrow(uint256 escrowId)`: Allows an auditor to reject an escrow.
-- `claimEscrow(uint256 escrowId)`: Allows an employee to claim an approved escrow.
-- `cancelEscrow(uint256 escrowId)`: Allows a company to cancel a pending or rejected escrow.
-- `addEscrowAuditor(uint256 escrowId, address auditor)`: Adds an auditor to a standalone escrow.
-- `removeEscrowAuditor(uint256 escrowId, address auditor)`: Removes an auditor from a standalone escrow.
-
-### View Functions
-General-purpose functions for retrieving information.
-
-- `getPayment(uint256 paymentId)`: Returns details of a payment.
-- `getEscrow(uint256 escrowId)`: Returns details of an escrow.
-- `getEmployeePayments(address employee)`: Returns all payment IDs for an employee.
-- `getCompanyPayments(address company)`: Returns all payment IDs for a company.
-- `getEmployeeEscrows(address employee)`: Returns all escrow IDs for an employee.
-- `getCompanyEscrows(address company)`: Returns all escrow IDs for a company.
-- `getPaymentEscrows(uint256 paymentId)`: Returns all escrow IDs linked to a payment.
-- `getClaimableEscrows(address employee)`: Returns all approved escrows for an employee.
-- `getTotalEarned(uint256 paymentId)`: Returns the total amount earned in a stream (withdrawn + claimable).
-
-## Key Features
-
-### Security
-- **Reentrancy Guard**: Protects against reentrancy attacks on key functions.
-- **Access Control**: Role-based access ensures that only authorized addresses can perform sensitive actions.
-- **Pausable Contract**: Admins can pause the creation of new payments.
-- **Auditor Approval**: Escrows require auditor sign-off, preventing unauthorized fund claims.
-
-### Functionality
-- **Dual Payment Models**: Supports both continuous streaming and discrete milestone payments.
-- **Flexible Escrows**: Escrows can be independent or linked to payment streams.
-- **Platform Fees**: A configurable fee can be taken on payments.
-- **Comprehensive Event Logs**: All major actions emit events for transparency and off-chain tracking.
-
-## Future Enhancements
-
-- [ ] Multi-token support within a single stream/escrow.
-- [ ] Governance mechanism for protocol parameters.
-- [ ] Frontend application for interacting with the contract.
-- [ ] Subgraph for efficient data querying.
-
-## License
-
+## 📜 License
 MIT
