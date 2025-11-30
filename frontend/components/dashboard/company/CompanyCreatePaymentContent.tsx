@@ -35,6 +35,9 @@ export default function CompanyCreatePaymentContent() {
   const [balance, setBalance] = useState<string>("0");
   const [isApproved, setIsApproved] = useState(false); // Simplified approval tracking for UX
 
+  // New State for Secret Key Display
+  const [createdAuditorSecretKey, setCreatedAuditorSecretKey] = useState<string | null>(null);
+
   // Fetch user balance for selected token
   useEffect(() => {
     const fetchBalance = async () => {
@@ -98,13 +101,6 @@ export default function CompanyCreatePaymentContent() {
       const eAmount = isEscrowEnabled ? escrowAmount || "0" : "0";
       const duration = isStreamEnabled ? parseInt(streamDuration) : 0;
 
-      // If stream is disabled but logic requires valid duration, pass 0 or min duration.
-      // However, contract requires duration >= 1 day.
-      // If streamAmount is 0, the duration might technically matter less but contract checks valid range.
-      // We'll send a valid duration (1 day) even if stream amount is 0 to pass contract checks if needed,
-      // or relying on the fact that if stream is disabled we are likely creating an escrow-only payment?
-      // Looking at contract: `require(duration >= MIN_PAYMENT_DURATION)` is always checked.
-      // So we must send at least 1 day even for Escrow-only payments.
       const finalDuration = duration > 0 ? duration : 1;
       const finalAuditor = auditorAddress || walletAddress; // If blank, assign self
 
@@ -112,7 +108,8 @@ export default function CompanyCreatePaymentContent() {
       console.log("🔐 Generating auditor keypair for encryption...");
       const { publicKey: auditorPublicKey, secretKey: auditorSecretKey } = generateKeypair();
       console.log(`✅ Public Key (for contract): ${auditorPublicKey.substring(0, 20)}...`);
-      console.log(`🔒 Secret Key (save securely): ${auditorSecretKey.substring(0, 20)}...`);
+      
+      // We don't log the secret key here anymore since we display it in the UI
 
       await createPayment(
         contractAddress as any,
@@ -127,14 +124,55 @@ export default function CompanyCreatePaymentContent() {
         selectedToken.decimals
       );
 
-      // Success! Redirect to list
-      setActiveDashboardView('company-streams');
+      // Success! Don't redirect yet. Show key.
+      setCreatedAuditorSecretKey(auditorSecretKey);
+      
     } catch (err) {
       setError(err instanceof Error ? err.message : "Creation failed");
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Success View with Key Reveal
+  if (createdAuditorSecretKey) {
+    return (
+        <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h1 className="text-3xl font-bold text-green-400">Payment Created Successfully!</h1>
+            </div>
+            <Card className="border-green-500/50 bg-green-900/10">
+                <div className="p-4 text-center space-y-6">
+                    <div className="text-6xl">🔐</div>
+                    <h2 className="text-xl font-bold text-slate-100">Save the Auditor Secret Key</h2>
+                    <p className="text-slate-300 max-w-xl mx-auto">
+                        A unique encryption key has been generated for this payment&apos;s auditor.
+                        <br/>
+                        <strong className="text-red-400">You must copy this key and send it securely to the Auditor.</strong>
+                        <br/>
+                        Without this key, they cannot decrypt and review the evidence.
+                    </p>
+
+                    <div className="bg-slate-950 border border-slate-700 p-4 rounded-lg relative max-w-2xl mx-auto">
+                        <p className="font-mono text-sm text-green-300 break-all select-all">
+                            {createdAuditorSecretKey}
+                        </p>
+                    </div>
+
+                    <div className="pt-4">
+                        <Button
+                            variant="primary"
+                            onClick={() => setActiveDashboardView('company-streams')}
+                            className="w-48"
+                        >
+                            I have saved the key
+                        </Button>
+                    </div>
+                </div>
+            </Card>
+        </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

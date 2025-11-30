@@ -13,7 +13,7 @@
 export interface EncryptedData {
   nonce: string; // Base64 encoded
   ciphertext: string; // Base64 encoded
-  publicKey: string; // Base64 encoded (for reference)
+  ephemeralPublicKey: string; // Base64 encoded (The sender's ephemeral public key, REQUIRED for decryption)
 }
 
 /**
@@ -36,33 +36,35 @@ export function generateKeypair(): { publicKey: string; secretKey: string } {
 
 /**
  * Encrypt plaintext using recipient's public key
+ * Generates a random ephemeral keypair for the sender side of this specific message.
  *
  * @param plaintext - Data to encrypt (IPFS hash)
- * @param publicKeyBase64 - Recipient's public key (base64 encoded)
- * @returns EncryptedData object with nonce and ciphertext (base64 encoded)
+ * @param recipientPublicKeyBase64 - Recipient's public key (base64 encoded)
+ * @returns EncryptedData object with nonce, ciphertext, and ephemeralPublicKey
  */
 export function encryptWithPublicKey(
   plaintext: string,
-  publicKeyBase64: string
+  recipientPublicKeyBase64: string
 ): EncryptedData {
   const nacl = require('tweetnacl');
 
   try {
-    // Decode the public key
-    const publicKey = new Uint8Array(Buffer.from(publicKeyBase64, 'base64'));
+    // Decode the recipient's public key
+    const recipientPublicKey = new Uint8Array(Buffer.from(recipientPublicKeyBase64, 'base64'));
 
     // Generate a random nonce for this encryption
     const nonce = nacl.randomBytes(nacl.box.nonceLength);
 
-    // Create a temporary keypair for ephemeral encryption
-    // (In production, you might use the sender's actual keypair)
-    const senderKeypair = nacl.box.keyPair();
+    // Create a temporary (ephemeral) keypair for this specific encryption
+    // This is standard practice for NaCl box when we don't need sender authentication
+    const ephemeralKeypair = nacl.box.keyPair();
 
     // Encode plaintext to bytes
     const messageBytes = new TextEncoder().encode(plaintext);
 
     // Encrypt using NaCl box
-    const ciphertext = nacl.box(messageBytes, nonce, publicKey, senderKeypair.secretKey);
+    // box(message, nonce, recipientPublicKey, senderSecretKey)
+    const ciphertext = nacl.box(messageBytes, nonce, recipientPublicKey, ephemeralKeypair.secretKey);
 
     if (!ciphertext) {
       throw new Error('Encryption failed - no ciphertext generated');
@@ -71,7 +73,7 @@ export function encryptWithPublicKey(
     return {
       nonce: Buffer.from(nonce).toString('base64'),
       ciphertext: Buffer.from(ciphertext).toString('base64'),
-      publicKey: publicKeyBase64,
+      ephemeralPublicKey: Buffer.from(ephemeralKeypair.publicKey).toString('base64'),
     };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Unknown encryption error';
@@ -83,15 +85,13 @@ export function encryptWithPublicKey(
  * Decrypt data using your secret key
  * Only the owner of the secret key can decrypt
  *
- * @param encryptedData - Object with nonce and ciphertext (base64 encoded)
- * @param secretKeyBase64 - Your secret key (base64 encoded)
- * @param senderPublicKeyBase64 - Sender's public key (base64 encoded)
+ * @param encryptedData - Object with nonce, ciphertext, and ephemeralPublicKey
+ * @param recipientSecretKeyBase64 - Your secret key (base64 encoded)
  * @returns Decrypted plaintext
  */
 export function decryptWithSecretKey(
   encryptedData: EncryptedData,
-  secretKeyBase64: string,
-  senderPublicKeyBase64: string
+  recipientSecretKeyBase64: string
 ): string {
   const nacl = require('tweetnacl');
 
@@ -99,14 +99,15 @@ export function decryptWithSecretKey(
     // Decode inputs from base64
     const nonce = new Uint8Array(Buffer.from(encryptedData.nonce, 'base64'));
     const ciphertext = new Uint8Array(Buffer.from(encryptedData.ciphertext, 'base64'));
-    const secretKey = new Uint8Array(Buffer.from(secretKeyBase64, 'base64'));
-    const senderPublicKey = new Uint8Array(Buffer.from(senderPublicKeyBase64, 'base64'));
+    const ephemeralPublicKey = new Uint8Array(Buffer.from(encryptedData.ephemeralPublicKey, 'base64'));
+    const recipientSecretKey = new Uint8Array(Buffer.from(recipientSecretKeyBase64, 'base64'));
 
     // Decrypt using NaCl box open
-    const decrypted = nacl.box.open(ciphertext, nonce, senderPublicKey, secretKey);
+    // box.open(ciphertext, nonce, senderPublicKey, recipientSecretKey)
+    const decrypted = nacl.box.open(ciphertext, nonce, ephemeralPublicKey, recipientSecretKey);
 
     if (!decrypted) {
-      throw new Error('Decryption failed - could not decrypt message');
+      throw new Error('Decryption failed - could not decrypt message (Wrong key?)');
     }
 
     // Convert decrypted bytes to string
@@ -135,9 +136,19 @@ export function serializeEncryptedData(encryptedData: EncryptedData): string {
 export function deserializeEncryptedData(jsonString: string): EncryptedData {
   try {
     const data = JSON.parse(jsonString);
+    // Check for required fields (support old format if needed, but prefer new)
     if (!data.nonce || !data.ciphertext) {
-      throw new Error('Invalid encrypted data format');
+      throw new Error('Invalid encrypted data format: missing nonce or ciphertext');
     }
+    if (!data.ephemeralPublicKey && !data.publicKey) {
+       throw new Error('Invalid encrypted data format: missing public key');
+    }
+    // Migration helper: if old 'publicKey' exists but no 'ephemeralPublicKey', map it
+    // Note: This won't actually fix old broken data, but prevents crash
+    if (!data.ephemeralPublicKey && data.publicKey) {
+        data.ephemeralPublicKey = data.publicKey;
+    }
+    
     return data as EncryptedData;
   } catch (error) {
     throw new Error(`Failed to deserialize encrypted data: ${error instanceof Error ? error.message : 'Unknown error'}`);

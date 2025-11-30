@@ -127,7 +127,7 @@ export default function EmployeeStreamsContent() {
       await refetch();
       setUploadModalPayment(null);
 
-      alert("✅ Evidence uploaded successfully! Auditor will review the encrypted hash.");
+      alert("✅ Evidence uploaded successfully! The Auditor can now decrypt it using the Private Key provided by the Company.");
     } catch (error) {
       console.error("❌ Upload failed:", error);
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
