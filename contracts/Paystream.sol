@@ -82,10 +82,11 @@ contract Paystream is ReentrancyGuard, AccessControl {
     event TokenWhitelistUpdated(address indexed token, bool isWhitelisted);
 
     event PaymentCreated(
-        uint256 indexed paymentId,
+        uint256 paymentId,
         string name,
         address indexed company,
         address indexed employee,
+        address indexed auditor,
         address token,
         uint256 streamAmount,
         uint256 escrowAmount,
@@ -266,6 +267,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
             name,
             msg.sender,
             employee,
+            finalAuditor,
             token,
             streamAmount,
             escrowAmount,

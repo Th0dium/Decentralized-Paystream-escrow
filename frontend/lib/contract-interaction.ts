@@ -13,10 +13,11 @@ export const PAYSTREAM_ABI = [
   {
     anonymous: false,
     inputs: [
-      { indexed: true, internalType: "uint256", name: "paymentId", type: "uint256" },
+      { indexed: false, internalType: "uint256", name: "paymentId", type: "uint256" },
       { indexed: false, internalType: "string", name: "name", type: "string" },
       { indexed: true, internalType: "address", name: "company", type: "address" },
       { indexed: true, internalType: "address", name: "employee", type: "address" },
+      { indexed: true, internalType: "address", name: "auditor", type: "address" },
       { indexed: false, internalType: "address", name: "token", type: "address" },
       { indexed: false, internalType: "uint256", name: "streamAmount", type: "uint256" },
       { indexed: false, internalType: "uint256", name: "escrowAmount", type: "uint256" },
@@ -311,7 +312,7 @@ export async function getEmployeePayments(
   // We look for PaymentCreated events where the 3rd indexed argument (employee) matches
   const logs = await publicClient.getLogs({
     address: contractAddress,
-    event: parseAbiItem('event PaymentCreated(uint256 indexed paymentId, string name, address indexed company, address indexed employee, address token, uint256 streamAmount, uint256 escrowAmount, uint64 startTime, uint64 stopTime)'),
+    event: parseAbiItem('event PaymentCreated(uint256 paymentId, string name, address indexed company, address indexed employee, address indexed auditor, address token, uint256 streamAmount, uint256 escrowAmount, uint64 startTime, uint64 stopTime)'),
     args: {
       employee: employeeAddress,
     },
@@ -360,7 +361,7 @@ export async function getCompanyPayments(
   // 1. Get Logs (Indexed Query)
   const logs = await publicClient.getLogs({
     address: contractAddress,
-    event: parseAbiItem('event PaymentCreated(uint256 indexed paymentId, string name, address indexed company, address indexed employee, address token, uint256 streamAmount, uint256 escrowAmount, uint64 startTime, uint64 stopTime)'),
+    event: parseAbiItem('event PaymentCreated(uint256 paymentId, string name, address indexed company, address indexed employee, address indexed auditor, address token, uint256 streamAmount, uint256 escrowAmount, uint64 startTime, uint64 stopTime)'),
     args: {
       company: companyAddress,
     },
@@ -693,7 +694,6 @@ export async function submitMilestone(
   contractAddress: Address,
   paymentId: string,
   amount: string,
-  auditorAddress: Address,
   tokenDecimals: number = 18
 ): Promise<{ transactionHash: string }> {
   const amountInWei = parseUnits(amount, tokenDecimals);
@@ -701,14 +701,13 @@ export async function submitMilestone(
   console.log("\n📤 === SUBMIT MILESTONE ===");
   console.log(`📍 Payment ID: ${paymentId}`);
   console.log(`💰 Amount: ${amount} (${amountInWei} wei)`);
-  console.log(`️ Auditor: ${auditorAddress}`);
 
   try {
     const hash = await writeContract(config, {
       address: contractAddress,
       abi: PAYSTREAM_ABI,
       functionName: "submitMilestone",
-      args: [BigInt(paymentId), amountInWei, auditorAddress],
+      args: [BigInt(paymentId), amountInWei],
     });
 
     console.log(`📤 Milestone submission transaction sent: ${hash}`);
