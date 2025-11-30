@@ -25,14 +25,14 @@ export default function MilestoneEvidenceModal({
   onReject,
   isSubmitting,
 }: MilestoneEvidenceModalProps) {
-  const [secretKey, setSecretKey] = useState("");
+  const [auditorSecretKey, setAuditorSecretKey] = useState("");
   const [decryptedIPFSHash, setDecryptedIPFSHash] = useState<string | null>(null);
   const [decryptError, setDecryptError] = useState<string | null>(null);
   const [isDecrypting, setIsDecrypting] = useState(false);
   const [actionType, setActionType] = useState<"approve" | "reject" | null>(null);
 
   const handleDecrypt = async () => {
-    if (!milestone || !secretKey || !milestone.encryptedEvidenceHash) {
+    if (!milestone || !auditorSecretKey || !milestone.encryptedEvidenceHash) {
       setDecryptError("Missing required data");
       return;
     }
@@ -47,10 +47,10 @@ export default function MilestoneEvidenceModal({
       );
 
       // Decrypt using the secret key
+      // The ephemeral public key is now extracted from encryptedData internally
       const ipfsHash = decryptWithSecretKey(
         encryptedData,
-        secretKey,
-        encryptedData.publicKey
+        auditorSecretKey
       );
 
       setDecryptedIPFSHash(ipfsHash);
@@ -87,7 +87,7 @@ export default function MilestoneEvidenceModal({
   };
 
   const handleClose = () => {
-    setSecretKey("");
+    setAuditorSecretKey("");
     setDecryptedIPFSHash(null);
     setDecryptError(null);
     setActionType(null);
@@ -179,22 +179,22 @@ export default function MilestoneEvidenceModal({
                           🔐 Encrypted Evidence
                         </h4>
                         <p className="text-xs text-slate-400 mb-3">
-                          The employee submitted encrypted evidence. You need your secret key to decrypt and view the IPFS file.
+                          The employee submitted encrypted evidence. To view it, please enter the Auditor Private Key that was shared with you by the Company (the payment creator).
                         </p>
 
                         {!decryptedIPFSHash && (
                           <div className="space-y-3">
                             <div>
                               <label className="block text-xs font-medium text-slate-300 mb-2">
-                                Your Auditor Secret Key (Base64)
+                                Auditor Private Key (Secret)
                               </label>
                               <textarea
-                                value={secretKey}
+                                value={auditorSecretKey}
                                 onChange={(e) => {
-                                  setSecretKey(e.target.value);
+                                  setAuditorSecretKey(e.target.value);
                                   setDecryptError(null);
                                 }}
-                                placeholder="Paste your secret key here (from payment creation logs)"
+                                placeholder="Paste the Auditor Private Key here..."
                                 className="w-full h-24 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-xs text-slate-100 font-mono focus:outline-none focus:ring-2 focus:ring-purple-500"
                               />
                             </div>
@@ -208,7 +208,7 @@ export default function MilestoneEvidenceModal({
                             <Button
                               onClick={handleDecrypt}
                               variant="primary"
-                              disabled={!secretKey || isDecrypting}
+                              disabled={!auditorSecretKey || isDecrypting}
                               loading={isDecrypting}
                               className="w-full text-sm"
                             >
@@ -229,20 +229,18 @@ export default function MilestoneEvidenceModal({
                             </div>
 
                             <div className="flex gap-2">
-                              <Button
-                                as="a"
-                                href={ipfsUrl || ""}
+                              <a
+                                href={ipfsUrl || "#"}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                variant="secondary"
-                                className="flex-1 text-sm"
+                                className="flex-1 inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-colors bg-slate-700 text-slate-200 hover:bg-slate-600"
                               >
                                 📎 View on IPFS
-                              </Button>
+                              </a>
                               <Button
                                 onClick={() => {
                                   setDecryptedIPFSHash(null);
-                                  setSecretKey("");
+                                  setAuditorSecretKey("");
                                 }}
                                 variant="secondary"
                                 className="flex-1 text-sm"
@@ -322,3 +320,4 @@ export default function MilestoneEvidenceModal({
     </Transition>
   );
 }
+
