@@ -158,13 +158,13 @@ export default function CompanyCreatePaymentContent() {
             <Card className="border-green-500/50 bg-green-900/10">
                 <div className="p-4 text-center space-y-6">
                     <div className="text-6xl">🔐</div>
-                    <h2 className="text-xl font-bold text-slate-100">Save the Auditor Secret Key</h2>
+                    <h2 className="text-xl font-bold text-slate-100">Save the Auditor Password</h2>
                     <p className="text-slate-300 max-w-xl mx-auto">
-                        A unique encryption key has been generated for this payment&apos;s auditor.
+                        A unique encryption password has been generated for this payment&apos;s auditor.
                         <br/>
-                        <strong className="text-red-400">You must copy this key and send it securely to the Auditor.</strong>
+                        <strong className="text-red-400">You must copy this password and send it securely to the Auditor.</strong>
                         <br/>
-                        Without this key, they cannot decrypt and review the evidence.
+                        Without this password, they cannot decrypt and review the evidence.
                     </p>
 
                     <div className="bg-slate-950 border border-slate-700 p-4 rounded-lg relative max-w-2xl mx-auto">
@@ -179,7 +179,7 @@ export default function CompanyCreatePaymentContent() {
                             onClick={() => setActiveDashboardView('company-streams')}
                             className="w-48"
                         >
-                            I have saved the key
+                            I have saved the password
                         </Button>
                     </div>
                 </div>

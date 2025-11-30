@@ -187,14 +187,14 @@ export default function MilestoneEvidenceModal({
                             🔐 Encrypted Evidence
                             </h4>
                             <p className="text-xs text-slate-400 mb-3">
-                            The employee submitted encrypted evidence. To view it, please enter the Auditor Private Key that was shared with you by the Company (the payment creator).
+                            The employee submitted encrypted evidence. To view it, please enter the Auditor Password that was shared with you by the Company (the payment creator).
                             </p>
 
                             {!decryptedIPFSHash && (
                             <div className="space-y-3">
                                 <div>
                                 <label className="block text-xs font-medium text-slate-300 mb-2">
-                                    Auditor Private Key (Secret)
+                                    Auditor Password
                                 </label>
                                 <textarea
                                     value={auditorSecretKey}
@@ -202,7 +202,7 @@ export default function MilestoneEvidenceModal({
                                     setAuditorSecretKey(e.target.value);
                                     setDecryptError(null);
                                     }}
-                                    placeholder="Paste the Auditor Private Key here..."
+                                    placeholder="Paste the Auditor Password here..."
                                     className="w-full h-24 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-xs text-slate-100 font-mono focus:outline-none focus:ring-2 focus:ring-purple-500"
                                 />
                                 </div>
