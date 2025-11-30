@@ -45,6 +45,7 @@ export const PAYSTREAM_ABI = [
           { internalType: "address", name: "company", type: "address" },
           { internalType: "address", name: "employee", type: "address" },
           { internalType: "address", name: "auditor", type: "address" },
+          { internalType: "string", name: "auditorPublicKey", type: "string" },
           { internalType: "address", name: "token", type: "address" },
           { internalType: "uint256", name: "streamAmount", type: "uint256" },
           { internalType: "uint256", name: "escrowAmount", type: "uint256" },
@@ -74,6 +75,7 @@ export const PAYSTREAM_ABI = [
       { internalType: "address", name: "company", type: "address" },
       { internalType: "address", name: "employee", type: "address" },
       { internalType: "address", name: "auditor", type: "address" },
+      { internalType: "string", name: "auditorPublicKey", type: "string" },
       { internalType: "address", name: "token", type: "address" },
       { internalType: "uint256", name: "streamAmount", type: "uint256" },
       { internalType: "uint256", name: "escrowAmount", type: "uint256" },
@@ -152,6 +154,7 @@ export const PAYSTREAM_ABI = [
       { internalType: "string", name: "name", type: "string" },
       { internalType: "address", name: "employee", type: "address" },
       { internalType: "address", name: "auditor", type: "address" },
+      { internalType: "string", name: "auditorPublicKey", type: "string" },
       { internalType: "address", name: "token", type: "address" },
       { internalType: "uint256", name: "streamAmount", type: "uint256" },
       { internalType: "uint256", name: "escrowAmount", type: "uint256" },
@@ -197,6 +200,17 @@ export const PAYSTREAM_ABI = [
       { internalType: "uint256", name: "amount", type: "uint256" },
     ],
     name: "submitMilestone",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "uint256", name: "paymentId", type: "uint256" },
+      { internalType: "uint256", name: "amount", type: "uint256" },
+      { internalType: "string", name: "encryptedEvidenceHash", type: "string" },
+    ],
+    name: "submitMilestoneWithEvidence",
     outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
     stateMutability: "nonpayable",
     type: "function",
@@ -431,6 +445,7 @@ export async function createPayment(
   name: string,
   employeeAddress: Address,
   auditorAddress: Address,
+  auditorPublicKey: string,
   tokenAddress: Address,
   streamAmount: string,
   escrowAmount: string,
@@ -452,6 +467,7 @@ export async function createPayment(
   console.log(`📝 Name: ${name}`);
   console.log(`👤 Employee: ${employeeAddress}`);
   console.log(`🕵️ Auditor: ${auditorAddress || "Company (Self)"}`);
+  console.log(`🔐 Auditor Public Key: ${auditorPublicKey.substring(0, 20)}...`);
   console.log(`💰 Stream Amount: ${streamAmount} tokens (${streamAmountInWei} wei)`);
   console.log(`🎯 Escrow Amount: ${escrowAmount} tokens (${escrowAmountInWei} wei)`);
   console.log(`📅 Duration: ${durationDays} days`);
@@ -467,6 +483,7 @@ export async function createPayment(
         name,
         employeeAddress,
         auditorAddress,
+        auditorPublicKey,
         tokenAddress,
         streamAmountInWei,
         escrowAmountInWei,
@@ -718,6 +735,44 @@ export async function submitMilestone(
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : "Milestone submission failed";
     console.error("❌ Error submitting milestone:", errorMsg);
+    throw new Error(errorMsg);
+  }
+}
+
+/**
+ * Submit a milestone with encrypted evidence
+ * Employee submits a milestone along with encrypted evidence (IPFS hash encrypted with auditor's public key)
+ */
+export async function submitMilestoneWithEvidence(
+  contractAddress: Address,
+  paymentId: string,
+  amount: string,
+  encryptedEvidenceHash: string,
+  tokenDecimals: number = 18
+): Promise<{ transactionHash: string }> {
+  const amountInWei = parseUnits(amount, tokenDecimals);
+
+  console.log("\n📤 === SUBMIT MILESTONE WITH EVIDENCE ===");
+  console.log(`📍 Payment ID: ${paymentId}`);
+  console.log(`💰 Amount: ${amount} (${amountInWei} wei)`);
+  console.log(`🔐 Evidence: ${encryptedEvidenceHash.substring(0, 50)}...`);
+
+  try {
+    const hash = await writeContract(config, {
+      address: contractAddress,
+      abi: PAYSTREAM_ABI,
+      functionName: "submitMilestoneWithEvidence",
+      args: [BigInt(paymentId), amountInWei, encryptedEvidenceHash],
+    });
+
+    console.log(`📤 Milestone submission transaction sent: ${hash}`);
+    const receipt = await waitForTransactionReceipt(config, { hash });
+    console.log(`✅ Milestone submitted with evidence in block ${receipt.blockNumber}`);
+
+    return { transactionHash: hash };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : "Milestone submission failed";
+    console.error("❌ Error submitting milestone with evidence:", errorMsg);
     throw new Error(errorMsg);
   }
 }

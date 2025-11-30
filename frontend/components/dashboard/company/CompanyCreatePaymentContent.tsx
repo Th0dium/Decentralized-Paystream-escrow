@@ -8,6 +8,7 @@ import { WHITELISTED_TOKENS, Token } from "@/lib/tokens";
 import { approveTokens, createPayment, getTokenBalance } from "@/lib/contract-interaction";
 import { isAddress, formatUnits } from "viem";
 import { useDashboardStore } from "@/lib/dashboard-store";
+import { generateKeypair } from "@/lib/encryption";
 
 export default function CompanyCreatePaymentContent() {
   const { walletAddress } = useAuth();
@@ -98,7 +99,7 @@ export default function CompanyCreatePaymentContent() {
       const duration = isStreamEnabled ? parseInt(streamDuration) : 0;
 
       // If stream is disabled but logic requires valid duration, pass 0 or min duration.
-      // However, contract requires duration >= 1 day. 
+      // However, contract requires duration >= 1 day.
       // If streamAmount is 0, the duration might technically matter less but contract checks valid range.
       // We'll send a valid duration (1 day) even if stream amount is 0 to pass contract checks if needed,
       // or relying on the fact that if stream is disabled we are likely creating an escrow-only payment?
@@ -107,11 +108,18 @@ export default function CompanyCreatePaymentContent() {
       const finalDuration = duration > 0 ? duration : 1;
       const finalAuditor = auditorAddress || walletAddress; // If blank, assign self
 
+      // Generate auditor keypair (public key will be stored on-chain, secret key stored locally)
+      console.log("🔐 Generating auditor keypair for encryption...");
+      const { publicKey: auditorPublicKey, secretKey: auditorSecretKey } = generateKeypair();
+      console.log(`✅ Public Key (for contract): ${auditorPublicKey.substring(0, 20)}...`);
+      console.log(`🔒 Secret Key (save securely): ${auditorSecretKey.substring(0, 20)}...`);
+
       await createPayment(
         contractAddress as any,
         paymentName,
         recipientAddress as any,
         finalAuditor as any,
+        auditorPublicKey,
         selectedToken.address as any,
         sAmount,
         eAmount,

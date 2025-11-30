@@ -5,10 +5,13 @@ import { Card } from "@/components/Card";
 import { useAuth } from "@/lib/hooks";
 import { useMyPayments, EnrichedPayment } from "@/lib/hooks/useMyPayments";
 import { formatUnits } from "viem";
-import { withdrawPayment } from "@/lib/contract-interaction"; // Import withdrawPayment correctly
+import { withdrawPayment } from "@/lib/contract-interaction";
 import { Button } from "@/components/Button";
 import PaymentDetailsModal from "@/components/PaymentDetailsModal";
 import UploadEvidenceModal from "@/components/UploadEvidenceModal";
+import { uploadToIPFS } from "@/lib/ipfs";
+import { encryptWithPublicKey, serializeEncryptedData, isValidPublicKey } from "@/lib/encryption";
+import { submitMilestoneWithEvidence } from "@/lib/contract-interaction";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -58,22 +61,77 @@ export default function EmployeeStreamsContent() {
   const handleUploadEvidence = async (file: File, milestoneAmount: string) => {
     setIsUploading(true);
     try {
-      console.log("📤 Uploading evidence:", {
-        file: file.name,
-        size: file.size,
+      if (!uploadModalPayment) {
+        throw new Error("Payment data missing");
+      }
+
+      console.log("📤 === EVIDENCE UPLOAD WORKFLOW ===");
+      console.log(`📝 Payment: ${uploadModalPayment.name} (#${uploadModalPayment.paymentId})`);
+      console.log(`💰 Milestone Amount: ${milestoneAmount}`);
+      console.log(`📄 File: ${file.name}`);
+
+      // Step 1: Upload file to IPFS
+      console.log("\n1️⃣ Uploading file to IPFS...");
+      const ipfsHash = await uploadToIPFS(file);
+      console.log(`✅ IPFS Hash: ${ipfsHash}`);
+
+      // Step 2: Get auditor's public key from payment data
+      console.log("\n2️⃣ Getting auditor's public key from payment data...");
+      // Fetch fresh payment data to ensure we have the auditorPublicKey field
+      // Note: The auditorPublicKey is stored in the Payment struct on contract
+      // For now we use uploadModalPayment which should have been enriched from contract
+
+      // TODO: Need to fetch payment again to get auditorPublicKey from contract
+      // For this MVP, we'll need to make sure EnrichedPayment includes auditorPublicKey
+      const auditorPublicKey = (uploadModalPayment as any).auditorPublicKey;
+
+      if (!auditorPublicKey) {
+        throw new Error(
+          "Auditor's public key not found in payment data. Contract may not have been updated."
+        );
+      }
+
+      if (!isValidPublicKey(auditorPublicKey)) {
+        throw new Error("Invalid auditor public key format");
+      }
+      console.log("✅ Public key validated");
+
+      // Step 3: Encrypt IPFS hash with auditor's public key
+      console.log("\n3️⃣ Encrypting IPFS hash with auditor's public key...");
+      const encryptedData = encryptWithPublicKey(ipfsHash, auditorPublicKey);
+      const encryptedDataJson = serializeEncryptedData(encryptedData);
+      console.log(`✅ Encrypted successfully`);
+      console.log(`   Nonce: ${encryptedData.nonce.substring(0, 20)}...`);
+      console.log(`   Ciphertext: ${encryptedData.ciphertext.substring(0, 20)}...`);
+
+      // Step 4: Submit milestone with encrypted evidence on-chain
+      console.log("\n4️⃣ Submitting milestone with encrypted evidence on-chain...");
+      const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
+      if (!contractAddress) throw new Error("Contract address not configured");
+
+      await submitMilestoneWithEvidence(
+        contractAddress as any,
+        uploadModalPayment.paymentId.toString(),
         milestoneAmount,
-        paymentId: uploadModalPayment?.paymentId,
-      });
+        encryptedDataJson,
+        uploadModalPayment.tokenDecimals
+      );
 
-      // TODO: Step 1 - Upload file to IPFS
-      // TODO: Step 2 - Get IPFS hash
-      // TODO: Step 3 - Encrypt hash with auditor's public key
-      // TODO: Step 4 - Submit milestone with encrypted hash on-chain
+      console.log("✅ Milestone submitted with encrypted evidence!");
+      console.log(`\n📋 Summary:`);
+      console.log(`   - IPFS Hash: ${ipfsHash}`);
+      console.log(`   - Encrypted: Yes (with auditor public key)`);
+      console.log(`   - On-chain: ✅ Submitted`);
 
-      alert("Upload functionality will be implemented next!");
+      // Refetch and close modal
+      await refetch();
+      setUploadModalPayment(null);
+
+      alert("✅ Evidence uploaded successfully! Auditor will review the encrypted hash.");
     } catch (error) {
-      console.error("Upload failed:", error);
-      alert("Upload failed: " + (error instanceof Error ? error.message : "Unknown error"));
+      console.error("❌ Upload failed:", error);
+      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+      alert("Upload failed: " + errorMsg);
     } finally {
       setIsUploading(false);
     }
