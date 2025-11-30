@@ -146,7 +146,7 @@ export default function PaymentDetailsModal({
                           ).toLocaleString()}
                         </span>
                       </div>
-                      <div className="flex justify-between pt-2">
+                      <div className="flex justify-between pt-2 border-t border-slate-700 mt-2">
                          <span className="text-slate-400">
                           {isCompany ? "Employee:" : "Company:"}
                         </span>
@@ -154,6 +154,14 @@ export default function PaymentDetailsModal({
                            {isCompany ? payment.employee : payment.company}
                         </span>
                       </div>
+                      {payment.escrowAmount > 0n && (
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Auditor:</span>
+                          <span className="text-purple-300 font-mono text-xs">
+                            {payment.auditor}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     
                     <div className="mt-4">

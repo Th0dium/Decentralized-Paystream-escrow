@@ -10,8 +10,9 @@ export interface EnrichedPayment {
   name: string
   company: string
   employee: string
+  auditor: string
   token: string // token address
-  tokenSymbol: string 
+  tokenSymbol: string
   tokenDecimals: number
   streamAmount: bigint
   escrowAmount: bigint
@@ -145,9 +146,10 @@ export function useMyPayments(userAddress: Address | null): UseMyPaymentsReturn 
           name: p.name,
           company: p.company,
           employee: p.employee,
+          auditor: p.auditor,
           token: p.token,
-          tokenSymbol: tokenInfo?.symbol || 'UNKNOWN', 
-          tokenDecimals: tokenInfo?.decimals || 18,    
+          tokenSymbol: tokenInfo?.symbol || 'UNKNOWN',
+          tokenDecimals: tokenInfo?.decimals || 18,
           streamAmount: p.streamAmount,
           escrowAmount: p.escrowAmount,
           startTime: p.startTime,
