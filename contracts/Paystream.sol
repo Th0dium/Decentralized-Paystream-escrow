@@ -21,7 +21,6 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 contract Paystream is ReentrancyGuard, AccessControl {
     using SafeERC20 for IERC20;
 
-    // ============ Enums ============
     enum MilestoneStatus {
         PENDING,
         APPROVED,
@@ -29,38 +28,36 @@ contract Paystream is ReentrancyGuard, AccessControl {
         CLAIMED
     }
 
-    // ============ Structs ============
     struct Payment {
         string name;
         address company;
         address employee;
-        address auditor; // Auditor for the entire payment
-        string auditorPublicKey; // Base64-encoded public key for evidence encryption (NaCl Box format)
+        address auditor;
+        string auditorPublicKey;
         IERC20 token;
-        uint256 streamAmount; // Amount for continuous streaming
-        uint256 escrowAmount; // Initial escrow amount locked for milestones
+        uint256 streamAmount;
+        uint256 escrowAmount;
         uint64 startTime;
         uint64 stopTime;
         uint64 lastWithdrawTime;
-        uint256 withdrawn; // Total withdrawn from stream
-        uint256 escrowed; // Current amount locked in escrow (starts at escrowAmount)
-        bool paused; // Payment-specific pause by company
+        uint256 withdrawn;
+        uint256 escrowed;
+        bool paused;
         bool cancelled;
-        uint64 totalPausedDuration; // Cumulative duration of all completed pauses
-        uint64 pausedAt; // Timestamp when the current pause started (0 if not paused)
+        uint64 totalPausedDuration;
+        uint64 pausedAt;
     }
 
     struct Milestone {
-        uint256 paymentId; // Which payment this belongs to
-        address submitter; // Employee who did the work
-        uint256 amount; // How much escrow they're claiming
-        MilestoneStatus status; // PENDING → APPROVED → CLAIMED
-        uint256 createdAt; // When submitted
-        uint256 approvedAt; // When auditor approved
-        string encryptedEvidenceHash; // Base64-encoded JSON with nonce + ciphertext (empty if no evidence)
+        uint256 paymentId;
+        address submitter;
+        uint256 amount;
+        MilestoneStatus status;
+        uint256 createdAt;
+        uint256 approvedAt;
+        string encryptedEvidenceHash;
     }
 
-    // ============ State ============
     uint256 private _nextPaymentId = 1;
     uint256 private _nextMilestoneId = 1;
 
@@ -74,12 +71,10 @@ contract Paystream is ReentrancyGuard, AccessControl {
     bool public newPaymentsPaused;
     mapping(address => bool) public isTokenWhitelisted;
 
-    // --- Validation Bounds ---
     uint256 public constant MIN_PAYMENT_DURATION = 1 days;
     uint256 public constant MAX_PAYMENT_DURATION = 365 days;
-    uint256 public constant MIN_PAYMENT_AMOUNT = 1000; // 0.000000000001 tokens (wei)
+    uint256 public constant MIN_PAYMENT_AMOUNT = 1000;
 
-    // ============ Events ============
     event NewPaymentCreationPaused(bool status);
     event TokenWhitelistUpdated(address indexed token, bool isWhitelisted);
 
@@ -140,38 +135,30 @@ contract Paystream is ReentrancyGuard, AccessControl {
         uint256 amount
     );
 
-    // ============ Constructor ============
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
-        // USDC Mainnet: 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
         isTokenWhitelisted[
             address(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48)
         ] = true;
-        // USDT Mainnet: 0xdAC17F958D2ee523a2206206994597C13D831ec7
         isTokenWhitelisted[
             address(0xdAC17F958D2ee523a2206206994597C13D831ec7)
         ] = true;
-        // DAI Mainnet: 0x6B175474E89094C44Da98b954EedeAC495271d0F
         isTokenWhitelisted[
             address(0x6B175474E89094C44Da98b954EedeAC495271d0F)
         ] = true;
 
-        // USDC Sepolia: 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238
         isTokenWhitelisted[
             address(0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238)
         ] = true;
-        // USDT Sepolia: 0xaA8E23Fb1079EA71e0a56F48a2aA51851D8433D0
         isTokenWhitelisted[
             address(0xaA8E23Fb1079EA71e0a56F48a2aA51851D8433D0)
         ] = true;
-        // DAI Sepolia: 0xff34B3d4aEE5D82176C1E28c29d5cc3d426eb39D
         isTokenWhitelisted[
             address(0xff34B3d4aEE5D82176C1E28c29d5cc3d426eb39D)
         ] = true;
     }
 
-    // ============ Admin Functions ============
     /**
      * @notice Toggles the pause state for new payment creation.
      * @param status The new pause status.
@@ -197,7 +184,6 @@ contract Paystream is ReentrancyGuard, AccessControl {
         emit TokenWhitelistUpdated(token, whitelisted);
     }
 
-    // ============ Payment Creation ============
     /**
      * @notice Create a new payment. The caller must have approved tokens.
      * @param name Name/Title of the payment
@@ -225,7 +211,6 @@ contract Paystream is ReentrancyGuard, AccessControl {
         require(isTokenWhitelisted[token], "token not whitelisted");
         require(!newPaymentsPaused, "payment creation is paused");
         require(employee != address(0), "invalid employee");
-        // require(employee != msg.sender, "company cannot be employee"); // Allow self-payment for testing
         require(token != address(0), "invalid token");
         require(bytes(name).length > 0, "name required");
         require(
@@ -240,16 +225,12 @@ contract Paystream is ReentrancyGuard, AccessControl {
         require(duration <= MAX_PAYMENT_DURATION, "duration too long");
 
         address finalAuditor = auditor == address(0) ? msg.sender : auditor;
-        // require(finalAuditor != employee, "auditor cannot be employee"); // Allow self-auditing for testing
-        // auditorPublicKey is optional. If empty, evidence is not encrypted.
 
         uint256 totalAmount = streamAmount + escrowAmount;
 
-        // --- Fund Transfers ---
         IERC20 erc20 = IERC20(token);
         erc20.safeTransferFrom(msg.sender, address(this), totalAmount);
 
-        // --- Payment Creation ---
         uint256 paymentId = _nextPaymentId++;
         payments[paymentId] = Payment({
             name: name,
@@ -264,7 +245,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
             stopTime: stopTime,
             lastWithdrawTime: startTime,
             withdrawn: 0,
-            escrowed: escrowAmount, // Initialize escrowed with escrowAmount
+            escrowed: escrowAmount,
             paused: false,
             cancelled: false,
             totalPausedDuration: 0,
@@ -289,8 +270,6 @@ contract Paystream is ReentrancyGuard, AccessControl {
         );
         return paymentId;
     }
-
-    // ============ Core Payment Interaction (Withdraw, Pause, etc.) ============
 
     function claimable(uint256 paymentId) public view returns (uint256) {
         Payment storage p = payments[paymentId];
@@ -372,10 +351,8 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
         p.cancelled = true;
 
-        // Calculate the total amount earned by the employee from the continuous stream
         uint256 totalAccrued = getTotalEarned(paymentId);
 
-        // Refund the unearned stream amount
         uint256 refundStream = p.streamAmount > totalAccrued
             ? p.streamAmount - totalAccrued
             : 0;
@@ -396,8 +373,6 @@ contract Paystream is ReentrancyGuard, AccessControl {
         );
     }
 
-    // ============ Milestone Management ============
-
     function submitMilestone(
         uint256 paymentId,
         uint256 amount
@@ -416,7 +391,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
             status: MilestoneStatus.PENDING,
             createdAt: block.timestamp,
             approvedAt: 0,
-            encryptedEvidenceHash: "" // No evidence for basic milestone submission
+            encryptedEvidenceHash: ""
         });
 
         paymentMilestones[paymentId].push(milestoneId);
@@ -519,7 +494,6 @@ contract Paystream is ReentrancyGuard, AccessControl {
         emit MilestoneClaimed(milestoneId, m.paymentId, m.submitter, m.amount);
     }
 
-    // ============ View Functions ============
     function getPayment(
         uint256 paymentId
     ) external view returns (Payment memory) {
