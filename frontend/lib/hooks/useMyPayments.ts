@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Address, parseAbiItem } from 'viem'
+import { Address } from 'viem'
 import { usePublicClient } from 'wagmi'
 import { PAYSTREAM_ABI, getTokenSymbol, getTokenDecimals } from '@/lib/contract-interaction'
 

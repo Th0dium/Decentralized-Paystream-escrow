@@ -4,7 +4,7 @@ import { Fragment, useState } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import { Button } from "@/components/Button";
 import { ipfsService } from "@/lib/ipfs-service";
-import { submitMilestone } from "@/lib/contract-interaction";
+import { submitMilestoneWithEvidence } from "@/lib/contract-interaction";
 
 interface MilestoneSubmissionModalProps {
   isOpen: boolean;
@@ -52,7 +52,7 @@ export default function MilestoneSubmissionModal({
       const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
       if (!contractAddress) throw new Error("Contract address not configured");
 
-      await submitMilestone(
+      await submitMilestoneWithEvidence(
         contractAddress as any,
         paymentId.toString(),
         amount,

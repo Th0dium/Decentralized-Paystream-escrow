@@ -7,6 +7,8 @@
  * - Private key: Secret, used to decrypt (only auditor has this)
  */
 
+import nacl from 'tweetnacl';
+
 export interface EncryptedData {
   nonce: string; // Base64 encoded
   ciphertext: string; // Base64 encoded
@@ -20,9 +22,6 @@ export interface EncryptedData {
  * @returns Object with publicKey and secretKey (both base64 encoded)
  */
 export function generateKeypair(): { publicKey: string; secretKey: string } {
-  // Dynamically import tweetnacl
-  const nacl = require('tweetnacl');
-
   const keypair = nacl.box.keyPair();
 
   return {
@@ -43,8 +42,6 @@ export function encryptWithPublicKey(
   plaintext: string,
   recipientPublicKeyBase64: string
 ): EncryptedData {
-  const nacl = require('tweetnacl');
-
   try {
     // Decode the recipient's public key
     const recipientPublicKey = new Uint8Array(Buffer.from(recipientPublicKeyBase64, 'base64'));
@@ -90,8 +87,6 @@ export function decryptWithSecretKey(
   encryptedData: EncryptedData,
   recipientSecretKeyBase64: string
 ): string {
-  const nacl = require('tweetnacl');
-
   try {
     // Decode inputs from base64
     const nonce = new Uint8Array(Buffer.from(encryptedData.nonce, 'base64'));

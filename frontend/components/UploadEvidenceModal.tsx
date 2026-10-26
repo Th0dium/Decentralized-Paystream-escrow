@@ -197,7 +197,7 @@ export default function UploadEvidenceModal({
                       <br />
                       1. Uploaded to IPFS (decentralized storage)
                       <br />
-                      2. Encrypted with auditor's public key
+                      2. Encrypted with auditor&apos;s public key
                       <br />
                       3. Hash published on-chain for verification
                     </p>
