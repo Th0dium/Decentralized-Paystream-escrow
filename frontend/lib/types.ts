@@ -1,17 +1,3 @@
-// Authentication types
-export interface AuthResponse {
-  success: boolean;
-  data?: {
-    walletAddress: string;
-    isCompany: boolean;
-    isEmployee: boolean;
-    isAuditor: boolean;
-    isNewUser?: boolean;
-    token?: string;
-  };
-  error?: string;
-}
-
 // Stream types
 export interface Stream {
   streamId: number;
@@ -60,12 +46,4 @@ export interface TransactionState {
   hash?: string;
   status: "idle" | "pending" | "success" | "error";
   error?: string;
-}
-
-// API Response types
-export interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
 }

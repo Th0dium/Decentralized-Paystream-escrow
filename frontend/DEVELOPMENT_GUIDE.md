@@ -39,21 +39,6 @@ This is a Next.js 14 frontend for the Paystream platform, which supports both ti
 - To add a new page, create a `page.tsx` file within a new folder in the `/app/dashboard` directory.
 - To add a new component, create a `.tsx` file in the `/components` directory.
 
-### Calling an API Endpoint
-The API client is configured in `lib/api-client.ts`. Use it to fetch data from the backend.
-```typescript
-import { paymentsApi } from "@/lib/api-client";
-
-const fetchPayments = async (walletAddress) => {
-  try {
-    const response = await paymentsApi.getEmployeePayments(walletAddress);
-    console.log(response.data);
-  } catch (error) {
-    console.error("Failed to fetch payments:", error);
-  }
-};
-```
-
 ### Using the Auth Store
 The Zustand auth store (`lib/auth-store.ts`) provides access to the user's authentication state.
 ```typescript

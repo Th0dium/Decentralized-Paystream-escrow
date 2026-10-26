@@ -32,7 +32,6 @@ frontend/
 │   └── Card.tsx                      # Card container component
 │
 ├── lib/                              # Core utilities & logic
-│   ├── api-client.ts                 # Axios API client with interceptors
 │   ├── auth-store.ts                 # Zustand authentication store
 │   ├── hooks.ts                      # Custom React hooks for data fetching
 │   ├── types.ts                      # TypeScript type definitions

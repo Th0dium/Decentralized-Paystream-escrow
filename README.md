@@ -22,7 +22,7 @@ The platform provides distinct dashboards and capabilities for three key roles:
 *   **Real-time Withdrawals:** Claim vested streaming funds ("salary") at any time.
 *   **Milestone Submission:** Request funds from the Escrow pool by creating Milestones.
 *   **Evidence Upload:** Upload proof of work (files, documents) to IPFS directly from the dashboard.
-*   **Secure Privacy:** Optional encryption ensures only the Auditor can view sensitive evidence.
+*   **Evidence Privacy:** Optional encryption hides the evidence link so only the Auditor can locate it (see limitations below).
 
 #### 🕵️ Auditor (Verifier)
 *   **Third-Party Verification:** A designated neutral party (or the Company itself) responsible for reviewing work.
@@ -31,7 +31,8 @@ The platform provides distinct dashboards and capabilities for three key roles:
 
 ### 3. 🔒 Security & Privacy (Encryption)
 We prioritize user privacy for sensitive work contracts.
-*   **Hybrid Encryption (NaCl):** Utilizes Curve25519 and XSalsa20 to encrypt evidence files client-side before they touch the IPFS network.
+*   **Hybrid Encryption (NaCl):** Utilizes Curve25519 and XSalsa20 to encrypt the evidence's IPFS link (CID) client-side.
+*   **Limitation:** The evidence file itself is uploaded to IPFS unencrypted, so anyone who obtains the CID can read it. Encrypting the file before upload is the next step.
 *   **Opt-in Privacy:** Companies can choose to enforce encryption or allow public evidence transparency.
 *   **Secure Key Sharing:** Decryption keys are generated client-side and shared securely off-chain, ensuring not even the protocol developers can access private data.
 *   *Learn more in the [Encryption Mechanism Documentation](./docs/ENCRYPTION_MECHANISM.md).*
@@ -39,6 +40,7 @@ We prioritize user privacy for sensitive work contracts.
 ### 4. 💾 Decentralized Storage
 *   **IPFS Integration:** All evidence files are stored on the InterPlanetary File System (via Pinata) ensuring data immutability and decentralization.
 *   **Smart Contract Reference:** Only the IPFS Hash (CID) and encryption metadata are stored on-chain to minimize gas costs.
+*   **Limitation:** Uploads call Pinata directly from the browser with `NEXT_PUBLIC_PINATA_JWT`, so the key is visible to users. A production setup should upload through a server route.
 
 ### 5. 🛡️ Admin & Governance
 *   **Token Whitelist:** The protocol Admin manages a whitelist of allowed ERC-20 tokens (e.g., USDC, USDT, DAI) to prevent spam or malicious token usage.
