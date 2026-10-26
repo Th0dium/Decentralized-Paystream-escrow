@@ -225,6 +225,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
         require(isTokenWhitelisted[token], "token not whitelisted");
         require(!newPaymentsPaused, "payment creation is paused");
         require(employee != address(0), "invalid employee");
+        require(employee != msg.sender, "company cannot be employee");
         require(token != address(0), "invalid token");
         require(bytes(name).length > 0, "name required");
         require(
@@ -239,6 +240,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
         require(duration <= MAX_PAYMENT_DURATION, "duration too long");
 
         address finalAuditor = auditor == address(0) ? msg.sender : auditor;
+        require(finalAuditor != employee, "auditor cannot be employee");
 
         uint256 totalAmount = streamAmount + escrowAmount;
 
@@ -295,33 +297,9 @@ contract Paystream is ReentrancyGuard, AccessControl {
         Payment storage p = payments[paymentId];
         require(p.company != address(0), "payment does not exist");
 
-        uint64 nowTs = uint64(block.timestamp);
-        // Payment hasn't started yet
-        if (nowTs < p.startTime) return 0;
+        uint256 accrued = getTotalEarned(paymentId);
 
-        uint64 totalDuration = p.stopTime - p.startTime;
-        // Edge case: instant payment (should not happen due to MIN_PAYMENT_DURATION)
-        if (totalDuration == 0) return p.streamAmount - p.withdrawn;
-
-        // Cap elapsed time at total duration
-        uint64 rawElapsed = nowTs > p.stopTime
-            ? totalDuration
-            : nowTs - p.startTime;
-
-        // Calculate total pause time (historical + current if paused)
-        uint64 currentPauseDuration = p.paused ? nowTs - p.pausedAt : 0;
-        uint64 totalPausedTime = p.totalPausedDuration + currentPauseDuration;
-
-        // Subtract paused time from elapsed time to get actual working time
-        uint64 workingTime = rawElapsed > totalPausedTime
-            ? rawElapsed - totalPausedTime
-            : 0;
-
-        // Linear vesting: (totalAmount * workingTime) / totalDuration
-        uint256 accrued = (p.streamAmount * workingTime) / totalDuration;
-        if (accrued > p.streamAmount) accrued = p.streamAmount; // Safety cap
-
-        // Return only unvested amount
+        // Return only the earned amount not yet withdrawn
         if (accrued <= p.withdrawn) return 0;
         return accrued - p.withdrawn;
     }
@@ -361,6 +339,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
         require(p.company != address(0), "payment does not exist");
         require(msg.sender == p.company, "not company");
         require(!p.paused, "already paused");
+        require(block.timestamp < p.stopTime, "stream ended");
 
         p.paused = true;
         p.pausedAt = uint64(block.timestamp); // Record pause start time
@@ -378,8 +357,10 @@ contract Paystream is ReentrancyGuard, AccessControl {
         require(msg.sender == p.company, "not company");
         require(p.paused, "not paused");
 
-        // Calculate and accumulate pause duration
-        uint64 pauseDuration = uint64(block.timestamp) - p.pausedAt;
+        // Calculate and accumulate pause duration (time after stopTime doesn't count)
+        uint64 nowTs = uint64(block.timestamp);
+        uint64 pauseEnd = nowTs > p.stopTime ? p.stopTime : nowTs;
+        uint64 pauseDuration = pauseEnd - p.pausedAt;
 
         p.paused = false;
         p.totalPausedDuration += pauseDuration; // Add to total for claimable() calculation
@@ -403,15 +384,21 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
         // Calculate total earned (may exceed withdrawn if employee hasn't claimed yet)
         uint256 totalAccrued = getTotalEarned(paymentId);
+        // Earned but not yet withdrawn: paid out now, since withdraw() is blocked after cancel
+        uint256 owedToEmployee = totalAccrued - p.withdrawn;
 
         // Refund unvested stream amount
-        uint256 refundStream = p.streamAmount > totalAccrued
-            ? p.streamAmount - totalAccrued
-            : 0;
-        // Refund all remaining escrow (unclaimed milestones)
+        uint256 refundStream = p.streamAmount - totalAccrued;
+        // Refund remaining escrow (approved milestones are already reserved, see approveMilestone)
         uint256 refundEscrow = p.escrowed;
 
-        // Transfer refunds to company (CEI pattern)
+        // Update state before transfers (CEI pattern)
+        p.withdrawn = totalAccrued;
+        p.escrowed = 0;
+
+        if (owedToEmployee > 0) {
+            p.token.safeTransfer(p.employee, owedToEmployee);
+        }
         if (refundStream > 0) {
             p.token.safeTransfer(p.company, refundStream);
         }
@@ -512,7 +499,7 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
     /**
      * @notice Approve a pending milestone (auditor only)
-     * @dev Changes status to APPROVED; employee can then claim funds
+     * @dev Changes status to APPROVED and reserves the amount from escrow; employee can then claim funds
      * @param milestoneId The milestone to approve
      */
     function approveMilestone(uint256 milestoneId) external {
@@ -523,9 +510,12 @@ contract Paystream is ReentrancyGuard, AccessControl {
         Payment storage p = payments[m.paymentId];
         require(msg.sender == p.auditor, "not payment auditor");
         require(p.auditor != m.submitter, "auditor cannot be submitter"); // Prevent self-approval
+        require(m.amount <= p.escrowed, "insufficient escrowed balance");
 
+        // Reserve funds now so a later cancel cannot refund them to the company
         m.status = MilestoneStatus.APPROVED;
         m.approvedAt = block.timestamp;
+        p.escrowed -= m.amount;
 
         emit MilestoneApproved(milestoneId, m.paymentId, msg.sender);
     }
@@ -561,11 +551,9 @@ contract Paystream is ReentrancyGuard, AccessControl {
 
         Payment storage p = payments[m.paymentId];
         require(msg.sender == p.employee, "not employee");
-        require(m.amount <= p.escrowed, "insufficient escrowed balance");
 
-        // Update state before transfer (CEI pattern)
+        // Update state before transfer (CEI pattern); funds were reserved on approval
         m.status = MilestoneStatus.CLAIMED;
-        p.escrowed -= m.amount;
 
         // Transfer milestone amount from escrow to employee
         p.token.safeTransfer(m.submitter, m.amount);
@@ -681,8 +669,9 @@ contract Paystream is ReentrancyGuard, AccessControl {
             ? totalDuration
             : nowTs - p.startTime;
 
-        // Account for pause time
-        uint64 currentPauseDuration = p.paused ? nowTs - p.pausedAt : 0;
+        // Account for pause time (time after stopTime doesn't count, so earnings never shrink)
+        uint64 pauseEnd = nowTs > p.stopTime ? p.stopTime : nowTs;
+        uint64 currentPauseDuration = p.paused ? pauseEnd - p.pausedAt : 0;
         uint64 totalPausedTime = p.totalPausedDuration + currentPauseDuration;
 
         // Calculate actual working time
