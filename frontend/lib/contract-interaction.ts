@@ -37,6 +37,13 @@ export const PAYSTREAM_ABI = [
   },
   {
     inputs: [{ internalType: "uint256", name: "paymentId", type: "uint256" }],
+    name: "claimable",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "paymentId", type: "uint256" }],
     name: "getPayment",
     outputs: [
       {

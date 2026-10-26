@@ -121,6 +121,19 @@ export function useMyPayments(userAddress: Address | null): UseMyPaymentsReturn 
       });
       const allTokenDetails = Object.assign({}, ...(await Promise.all(tokenDetailsPromises)));
 
+      // Ask the contract so pause time is accounted for the same way withdraw() does
+      const claimables = userRole === 'employee'
+        ? await Promise.all(
+            paymentIds.map(id =>
+              publicClient.readContract({
+                address: PAYSTREAM_ADDRESS,
+                abi: PAYSTREAM_ABI,
+                functionName: 'claimable',
+                args: [BigInt(id)],
+              })
+            )
+          )
+        : []
 
       return paymentDetails.map((payment, index) => {
         const p = payment as any // Payment struct from contract
@@ -135,11 +148,8 @@ export function useMyPayments(userAddress: Address | null): UseMyPaymentsReturn 
         // Calculate claimable amount for employees
         let claimableAmount: bigint | undefined
         if (userRole === 'employee') {
-          // Total claimable from stream portion
-          const totalVested = (BigInt(elapsed) * p.streamAmount) / BigInt(duration)
-          claimableAmount = totalVested - p.withdrawn
-          // Ensure non-negative
-          if (claimableAmount < 0n) claimableAmount = 0n
+          // withdraw() reverts while paused or after cancel, so nothing is claimable then
+          claimableAmount = p.paused || p.cancelled ? 0n : claimables[index]
         }
         
         const tokenInfo = allTokenDetails[p.token];
