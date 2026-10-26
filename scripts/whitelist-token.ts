@@ -1,7 +1,7 @@
 import { ethers } from "hardhat";
 
 async function main() {
-  const contractAddress = "0x55225ca36FF331838223194E8Edac30BA5B0600c";
+  const contractAddress = "0xEF1ea8Adb57Ece1a196C0fF4A52dAd2C9eeDb071";
   const usdcSepoliaAddress = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238";
 
   console.log("🔐 Whitelisting USDC token on Sepolia...");
