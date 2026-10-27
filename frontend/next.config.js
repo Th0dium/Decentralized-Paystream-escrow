@@ -1,6 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Deployment config lives in the repo; these override any env vars set on the host (e.g. Vercel dashboard)
+  env: {
+    NEXT_PUBLIC_CONTRACT_ADDRESS: "0xEF1ea8Adb57Ece1a196C0fF4A52dAd2C9eeDb071",
+    NEXT_PUBLIC_RPC_URL: "https://eth-sepolia.g.alchemy.com/v2/alch_gkoihJfcUK9LJHKYvs0Yt",
+  },
   images: {
     unoptimized: true,
   },

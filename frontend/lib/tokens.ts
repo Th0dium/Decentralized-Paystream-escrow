@@ -23,14 +23,6 @@ export const WHITELISTED_TOKENS: Token[] = [
     logo: "🟢",
   },
   {
-    id: "dai",
-    name: "Dai Stablecoin",
-    symbol: "DAI",
-    address: "0xff34B3d4aEE5D82176C1E28c29d5cc3d426eb39D",
-    decimals: 18,
-    logo: "🟡",
-  },
-  {
     id: "usdt",
     name: "Tether USD",
     symbol: "USDT",

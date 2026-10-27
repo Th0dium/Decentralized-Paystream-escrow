@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "(curl -s -o /dev/null --retry 30 --retry-connrefused --retry-delay 1 http://localhost:3000 && (explorer.exe http://localhost:3000 || open http://localhost:3000) 2>/dev/null) & next dev",
     "dev:turbo": "next dev --turbo",
     "build": "next build",
     "start": "next start",
