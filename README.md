@@ -2,6 +2,8 @@
 
 A comprehensive DeFi payment solution that hybridizes **Real-time Salary Streaming** with **Milestone-based Escrow**. This protocol allows organizations to manage payroll and project-based compensation in a trustless, transparent, and efficient manner on the Ethereum blockchain.
 
+**Live demo:** [decentralized-paystream-escrow.vercel.app](https://decentralized-paystream-escrow.vercel.app) (Sepolia testnet, pay with [test USDC](https://faucet.circle.com)) · **Contract:** [`0xEF1e…b071`](https://sepolia.etherscan.io/address/0xEF1ea8Adb57Ece1a196C0fF4A52dAd2C9eeDb071)
+
 ## 🌟 Key Features
 
 ### 1. Hybrid Payment Architecture
@@ -81,8 +83,9 @@ We prioritize user privacy for sensitive work contracts.
     ```
 
 4.  **Configure Environment:**
-    *   Create a `.env` file in `frontend/` based on `.env.example`.
-    *   Add your `NEXT_PUBLIC_PINATA_JWT` and `NEXT_PUBLIC_GATEWAY_URL`.
+    *   Create a `.env.local` file in `frontend/` based on `.env.example`.
+    *   Add your `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` and `NEXT_PUBLIC_PINATA_JWT`.
+    *   The contract address and RPC URL are set in `frontend/next.config.js`.
 
 5.  **Run Local Node (Optional for Dev):**
     ```bash
@@ -93,12 +96,19 @@ We prioritize user privacy for sensitive work contracts.
     ```bash
     npx hardhat run scripts/deploy.ts --network localhost
     ```
+    Then set the printed address as `NEXT_PUBLIC_CONTRACT_ADDRESS` in `frontend/next.config.js`.
 
 7.  **Start Frontend:**
     ```bash
     cd frontend
     npm run dev
     ```
+
+## 🧪 Testing
+```bash
+npm test
+```
+Covers salary streaming, role checks, and regression tests for cancel accounting (earned salary is paid out on cancel, approved milestones stay claimable and are never refunded twice) and pause handling.
 
 ## 📜 License
 MIT
