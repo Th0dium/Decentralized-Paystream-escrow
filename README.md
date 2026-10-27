@@ -84,8 +84,8 @@ We prioritize user privacy for sensitive work contracts.
 
 4.  **Configure Environment:**
     *   Create a `.env.local` file in `frontend/` based on `.env.example`.
-    *   Add your `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` and `NEXT_PUBLIC_PINATA_JWT`.
-    *   The contract address and RPC URL are set in `frontend/next.config.js`.
+    *   Optional: add your `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`.
+    *   The contract address, RPC URL and Pinata key are set in `frontend/next.config.js`.
 
 5.  **Run Local Node (Optional for Dev):**
     ```bash
