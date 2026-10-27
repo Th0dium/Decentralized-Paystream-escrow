@@ -3,7 +3,6 @@
 import { WagmiProvider, createConfig, http } from "wagmi";
 import { sepolia } from "wagmi/chains";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { injected } from "wagmi/connectors";
 import { createWeb3Modal } from "@web3modal/wagmi/react";
 
 import { BLOCKCHAIN_CONFIG } from "./constants";
@@ -22,9 +21,9 @@ const metadata = {
 // Configure wagmi with Sepolia testnet
 export const config = createConfig({
   chains: [sepolia],
-  connectors: [
-    injected(),
-  ],
+  // No generic injected() connector: it goes through window.ethereum, which any installed wallet
+  // (e.g. Phantom) can hijack. Wallets are discovered via EIP-6963 instead, each with its own provider.
+  connectors: [],
   transports: {
     [sepolia.id]: http(BLOCKCHAIN_CONFIG.RPC_URL),
   },
